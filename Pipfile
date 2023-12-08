@@ -47,6 +47,7 @@ urllib3 = "==1.26.6"
 zipp = "==3.17.0"
 clearml = "*"
 supervision = "*"
+filterpy = "*"
 
 [dev-packages]
 

@@ -1,1 +1,9 @@
 venv/
+runs/
+static/
+.DS_Store
+*.pt
+*.onnx
+*.txt
+*.jpg
+*.csv

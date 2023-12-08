@@ -1,9 +1,12 @@
 import cv2
 
+from logger import logger
+
 
 def extract_frame(video_path: str, fps: int = 5):
     video = cv2.VideoCapture(video_path)
     video_fps = video.get(cv2.CAP_PROP_FPS)
+    logger.debug(f'Video path: {video_path}, FPS: {video_fps}')
 
     frame_interval = int(video_fps / fps)
     frame_idx = 0
@@ -19,5 +22,5 @@ def extract_frame(video_path: str, fps: int = 5):
         frame_idx += 1
 
     video.release()
-    print(f'Extracted {frame_count} frames from {video_path}')
+    logger.info(f'Extracted {frame_count} frames from {video_path}')
     return

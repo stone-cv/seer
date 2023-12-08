@@ -6,6 +6,7 @@ import supervision as sv
 from time import time
 from ultralytics import YOLO
 
+from logger import logger
 
 
 class ObjectDetection:
@@ -44,6 +45,7 @@ class ObjectDetection:
         all_results = {}
         try:
             for frame, frame_idx in frame_generator:
+                logger.debug(f'Frame ID: {frame_idx}')
                 results = self.model.predict(source=frame)
 
                 for result in results:
@@ -55,7 +57,7 @@ class ObjectDetection:
                         conf = boxes.conf[0].astype(float)
                         xyxy = boxes.xyxy[0].tolist()
                         # id and is_track for tracking
-                        print(f'class_id: {class_id} ({type(class_id)}), conf: {conf} ({type(conf)}), xyxy: {xyxy} ({type(xyxy)})')
+                        logger.debug(f'class_id: {class_id} ({type(class_id)}), conf: {conf} ({type(conf)}), xyxy: {xyxy} ({type(xyxy)})')
 
                         prediction = {
                             "class_id": int(class_id),
@@ -66,7 +68,7 @@ class ObjectDetection:
                         all_results[frame_idx] = frame_pred
 
                     else:
-                        print('No detections')
+                        logger.debug('No detections')
 
                     # if class_id == 0.0:
                     #     xyxys.append(result.boxes.xyxy.cpu().numpy())
@@ -89,7 +91,7 @@ class ObjectDetection:
                             xyxy = prediction["xyxy"]
                             writer.writerow([frame_index, class_id, conf, xyxy])
 
-                print('Saving complete')
+                logger.info('Detection results saved')
 
         except StopIteration:
             pass

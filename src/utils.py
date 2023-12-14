@@ -7,6 +7,10 @@ from logger import logger
 
 def extract_frame(video_path: str, fps: int = 5) -> Any:
     video = cv2.VideoCapture(video_path)
+
+    # video_start_time = video.get(cv2.CAP_PROP_CREATION_TIME)
+    # logger.debug(f'Video start time: {video_start_time}')
+
     video_frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     video_fps = video.get(cv2.CAP_PROP_FPS)
     logger.debug(f'Video path: {video_path}, FPS: {video_fps}')

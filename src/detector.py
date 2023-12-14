@@ -9,6 +9,7 @@ from ultralytics import YOLO
 
 import config
 from logger import logger
+from tracker import Sort
 from utils import extract_frame
 from utils import get_time_from_video_path
 
@@ -58,18 +59,23 @@ class ObjectDetection:
                     class_id = boxes.cls[0].astype(int)
                     conf = boxes.conf[0].astype(float)
                     xyxy = boxes.xyxy[0].tolist()
-                    # id and is_track for tracking
+                    # track_id = boxes.id[0].astype(int)
                     logger.debug(f'class_id: {class_id} ({type(class_id)}), conf: {conf} ({type(conf)}), xyxy: {xyxy} ({type(xyxy)})')
 
                     prediction = {
                         "class_id": int(class_id),
+                        "track_id": 0,  # ?
                         "conf": round(float(conf), 2),  # invalid format for json
                         "xyxy": xyxy
                     }
                     frame_pred.append(prediction)
 
+                    detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)
+
                 else:
                     logger.debug('No detections')
+
+                    detections = np.empty((0, 5))
 
                     # if class_id == 0.0:
                     #     xyxys.append(result.boxes.xyxy.cpu().numpy())
@@ -79,22 +85,18 @@ class ObjectDetection:
         except Exception as e:
             logger.error(e)
         
-        return frame_pred
+        return frame_pred, detections
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):
         try:
-            # txt file with json dump
-            # with open(f'results.txt', 'w') as f:
-            #     json.dump(all_results, f)
-            
             # csv file
             start_time, _ = get_time_from_video_path(video_path)
             file_path = f"{config.results_dir}/{video_path.split('/')[-1].split('.')[0]}.csv"
 
             with open(f'{file_path}', "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(["Frame Index", "Class ID", "Class Name", "Confidence", "Time", "XYXY"])
+                writer.writerow(["Frame Index", "Class ID", "Class Name","Track ID", "Confidence", "Time", "XYXY"])
 
                 for frame_index, frame_predictions in results_dict.items():
                     detection_time = start_time + timedelta(seconds=frame_index/video_fps)
@@ -102,9 +104,10 @@ class ObjectDetection:
                     for prediction in frame_predictions:
                         class_id = prediction["class_id"]
                         class_name = self.CLASS_NAMES_DICT[class_id]
+                        track_id = prediction["track_id"]
                         conf = prediction["conf"]
                         xyxy = prediction["xyxy"]
-                        writer.writerow([frame_index, class_id, class_name, conf, detection_time, xyxy])
+                        writer.writerow([frame_index, class_id, class_name, track_id, conf, detection_time, xyxy])
 
             logger.info(f'Detection results saved at {file_path}')
 
@@ -157,6 +160,7 @@ class ObjectDetection:
             video_path=video_path,
             fps=5
         )
+        mot_tracker = Sort() 
         all_results = {}
         
         try:
@@ -164,8 +168,17 @@ class ObjectDetection:
                 video_fps = video_fps
 
                 logger.debug(f'Frame ID: {frame_idx}')
+                # results = self.model.track(source=frame, device='mps')
                 results = self.model.predict(source=frame)
-                frame_pred = self.parse_detections(results)
+
+                frame_pred, detections = self.parse_detections(results)
+
+                track_bbs_ids = mot_tracker.update(detections)
+                if track_bbs_ids.size != 0:
+                    track_id = int(track_bbs_ids[0][-1])
+                    frame_pred[0]["track_id"] = track_id
+                    logger.debug(f'Track ID: {track_id}')
+
                 all_results[frame_idx] = frame_pred
         except StopIteration:
             pass

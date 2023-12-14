@@ -4,10 +4,13 @@ import numpy as np
 import supervision as sv
 
 from time import time
+from datetime import timedelta
 from ultralytics import YOLO
 
+import config
 from logger import logger
 from utils import extract_frame
+from utils import get_time_from_video_path
 
 
 class ObjectDetection:
@@ -60,7 +63,7 @@ class ObjectDetection:
 
                     prediction = {
                         "class_id": int(class_id),
-                        "conf": float(conf),  # invalid format for json
+                        "conf": round(float(conf), 2),  # invalid format for json
                         "xyxy": xyxy
                     }
                     frame_pred.append(prediction)
@@ -79,26 +82,31 @@ class ObjectDetection:
         return frame_pred
 
 
-    def save_detections_to_csv(self, results_dict):
+    def save_detections_to_csv(self, results_dict, video_path, video_fps):
         try:
             # txt file with json dump
             # with open(f'results.txt', 'w') as f:
             #     json.dump(all_results, f)
             
             # csv file
-            with open('results/results.csv', "w", newline="") as file:
+            start_time, _ = get_time_from_video_path(video_path)
+            file_path = f"{config.results_dir}/{video_path.split('/')[-1].split('.')[0]}.csv"
+
+            with open(f'{file_path}', "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(["Frame Index", "Class ID", "Confidence", "XYXY"])
+                writer.writerow(["Frame Index", "Class ID", "Class Name", "Confidence", "Time", "XYXY"])
 
                 for frame_index, frame_predictions in results_dict.items():
+                    detection_time = start_time + timedelta(seconds=frame_index/video_fps)
+
                     for prediction in frame_predictions:
                         class_id = prediction["class_id"]
                         class_name = self.CLASS_NAMES_DICT[class_id]
                         conf = prediction["conf"]
                         xyxy = prediction["xyxy"]
-                        writer.writerow([frame_index, class_id, class_name, conf, xyxy])
+                        writer.writerow([frame_index, class_id, class_name, conf, detection_time, xyxy])
 
-            logger.info('Detection results saved')
+            logger.info(f'Detection results saved at {file_path}')
 
         except Exception as e:
             logger.error(e)
@@ -149,11 +157,12 @@ class ObjectDetection:
             video_path=video_path,
             fps=5
         )
-        start_time = time()
         all_results = {}
         
         try:
-            for frame, frame_idx in frame_generator:
+            for frame, frame_idx, video_fps in frame_generator:
+                video_fps = video_fps
+
                 logger.debug(f'Frame ID: {frame_idx}')
                 results = self.model.predict(source=frame)
                 frame_pred = self.parse_detections(results)
@@ -161,8 +170,11 @@ class ObjectDetection:
         except StopIteration:
             pass
 
-        self.save_detections_to_csv(all_results)
-                
+        self.save_detections_to_csv(
+            results_dict=all_results,
+            video_path=video_path,
+            video_fps=video_fps
+        )      
 
         # cap = cv2.VideoCapture(self.capture_index)
         # assert cap.isOpened()

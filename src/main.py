@@ -1,16 +1,28 @@
-from utils import extract_frame
-from detector import ObjectDetection
+from ultralytics import YOLO
 
+import config
 from logger import logger
+from detector import ObjectDetection
 
 
 def main():
     logger.info('App initiated')
-    detector = ObjectDetection(capture_index=0)
-    frame_generator = extract_frame('static/baggage-on-belt.mov')
 
     logger.info('Detection started')
-    detector.save_detections(frame_generator)
+    detector = ObjectDetection(capture_index=0)
+
+    # for video in config.videos:
+    detector(video_path=config.video_path)
+
 
 if __name__ == '__main__':
     main()
+
+    # model = YOLO("yolov8n.pt")
+    # model.predict(
+    #     source="static/stone_4sec.mp4",
+    #     show=True,
+    #     save=True,
+    #     save_txt=True,
+    #     device="mps",
+    # )

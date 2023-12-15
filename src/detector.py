@@ -12,6 +12,7 @@ from logger import logger
 from tracker import Sort
 from utils import extract_frame
 from utils import get_time_from_video_path
+from scenarios import find_class_objects_in_roi
 
 
 class ObjectDetection:
@@ -41,10 +42,11 @@ class ObjectDetection:
 
     def predict(self, frame):
 
-        try:
-            results = self.model(source=frame, device=self.device)
-        except StopIteration:
-            pass
+        results = self.model(
+            source=frame,
+            device=self.device,
+            conf=0.5
+        )
         
         return results
     
@@ -64,6 +66,7 @@ class ObjectDetection:
 
                     prediction = {
                         "class_id": int(class_id),
+                        "class_name": self.CLASS_NAMES_DICT[class_id],
                         "track_id": 0,  # ?
                         "conf": round(float(conf), 2),  # invalid format for json
                         "xyxy": xyxy
@@ -103,7 +106,7 @@ class ObjectDetection:
 
                     for prediction in frame_predictions:
                         class_id = prediction["class_id"]
-                        class_name = self.CLASS_NAMES_DICT[class_id]
+                        class_name = prediction["class_name"]
                         track_id = prediction["track_id"]
                         conf = prediction["conf"]
                         xyxy = prediction["xyxy"]
@@ -169,7 +172,11 @@ class ObjectDetection:
 
                 logger.debug(f'Frame ID: {frame_idx}')
                 # results = self.model.track(source=frame, device='mps')
-                results = self.model.predict(source=frame)
+                results = self.model.predict(  # from this model or general ?
+                    source=frame,
+                    device=self.device,
+                    conf=0.5
+                )
 
                 frame_pred, detections = self.parse_detections(results)
 
@@ -180,8 +187,16 @@ class ObjectDetection:
                     logger.debug(f'Track ID: {track_id}')
 
                 all_results[frame_idx] = frame_pred
+
         except StopIteration:
             pass
+
+        objects_in_roi = find_class_objects_in_roi(
+            roi_coord=config.camera_1_roi,
+            class_id=0,
+            result_dict=all_results
+        )
+        print(objects_in_roi)  # create events
 
         self.save_detections_to_csv(
             results_dict=all_results,

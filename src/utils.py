@@ -44,3 +44,51 @@ def get_time_from_video_path(video_path: str):
 
     logger.debug(f'Video: {video_path}, start time: {start_time}, end time: {end_time}')
     return start_time, end_time
+
+
+
+def get_camera_roi():  # doesn't work
+    # Initialize variables
+    drawing = False
+    roi_points = []
+
+    # Load the image or video frame
+    frame = cv2.imread("static/0.jpg")
+
+    def draw_roi(event, x, y, flags, param):
+        global roi_points, drawing  # eww
+
+        if event == cv2.EVENT_LBUTTONDOWN:
+            drawing = True
+            roi_points = [(x, y)]
+
+        elif event == cv2.EVENT_LBUTTONUP:
+            drawing = False
+            roi_points.append((x, y))
+            cv2.rectangle(frame, roi_points[0], roi_points[1], (0, 255, 0), 2)
+            cv2.imshow("Frame", frame)
+
+    # Create a window and set the callback function
+    cv2.namedWindow("Frame")
+    cv2.setMouseCallback("Frame", draw_roi)
+
+    # Display the frame and wait for the ROI to be defined
+    while True:
+        cv2.imshow("Frame", frame)
+        key = cv2.waitKey(1) & 0xFF
+
+        if key == ord("r"):
+            # Reset the ROI
+            roi_points = []
+            frame = cv2.imread("image.jpg")
+        elif key == ord("c"):
+            # Confirm the ROI and proceed with further processing
+            break
+
+    print(roi_points)
+    cv2.destroyAllWindows()
+    return roi_points
+
+
+if __name__ == '__main__':
+    get_camera_roi()

@@ -10,9 +10,11 @@ from ultralytics import YOLO
 import core.config as cfg
 from core.logger import logger
 from tracker.tracker import Sort
+# from core.models import Event
 from core.utils import extract_frame
 from core.utils import get_time_from_video_path
 from core.scenarios import find_class_objects_in_roi
+from core.scenarios import get_event_end_time
 
 
 class ObjectDetection:
@@ -211,7 +213,17 @@ class ObjectDetection:
             class_id=0,
             result_dict=all_results
         )
-        print(objects_in_roi)  # create events
+
+        for item in objects_in_roi:
+            last_detection_time = get_event_end_time(all_results, item['track_id'])
+            item['last_detection_time'] = last_detection_time
+            logger.debug(f'Objects in ROI: {objects_in_roi}')
+
+            # event = Event(
+            #     type_id = 0,  # create event types
+            #     start_time = item['time'],
+            #     end_time = item['last_detection_time']
+            # )
 
         self.save_detections_to_csv(
             results_dict=all_results,

@@ -1,17 +1,16 @@
 import yaml
 from typing import Optional
 
-from sqlalchemy import Column
 from sqlalchemy import Integer
 from sqlalchemy import String
 from sqlalchemy import Boolean
 from sqlalchemy import DateTime
 from sqlalchemy import ForeignKey
+from sqlalchemy.orm import Mapped
+from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
-from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import core.config as config
 from core.database import Base
 # from core.security import fernet_encrypt
 
@@ -19,13 +18,15 @@ from core.database import Base
 class Event(Base):
     __tablename__ = "events"
 
-    id = Column(Integer, primary_key=True, index=True)
-    type_id = Column(Integer, nullable=False)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
-    start_time = Column(DateTime)
-    end_time = Column(DateTime)
+    type_id: Mapped[int] = mapped_column(ForeignKey("event_types.id"))
+    event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
 
-    deleted = Column(Boolean, default=False, nullable=False)
+    start_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
+    end_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
+
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # @staticmethod
     # async def client_get_by_name(
@@ -36,3 +37,39 @@ class Event(Base):
     #     )
 
     #     return result.scalars().first()
+
+
+class EventType(Base):
+    __tablename__ = "event_types"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+
+    event: Mapped['Event'] = relationship(back_populates="event_type")  # ?
+
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class Camera(Base):
+    __tablename__ = "cameras"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    url: Mapped[str] = mapped_column(String(255))
+
+    # roi_id: Mapped[int] = mapped_column(ForeignKey("roi_zones.id"))
+    # event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
+
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
+class RegionOfInterest(Base):
+    __tablename__ = "roi_zones"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String(255))
+    coords: Mapped[str] = mapped_column(String(255))
+
+    # event: Mapped['Event'] = relationship(back_populates="event_type")  # ?
+
+    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

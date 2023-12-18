@@ -69,6 +69,7 @@ class ObjectDetection:
                         "class_name": self.CLASS_NAMES_DICT[class_id],
                         "track_id": 0,  # ?
                         "conf": round(float(conf), 2),  # invalid format for json
+                        "time": 0,
                         "xyxy": xyxy
                     }
                     frame_pred.append(prediction)
@@ -94,7 +95,6 @@ class ObjectDetection:
     def save_detections_to_csv(self, results_dict, video_path, video_fps):
         try:
             # csv file
-            start_time, _ = get_time_from_video_path(video_path)
             file_path = f"{cfg.results_dir}/{video_path.split('/')[-1].split('.')[0]}.csv"
 
             with open(f'{file_path}', "w", newline="") as file:
@@ -102,7 +102,6 @@ class ObjectDetection:
                 writer.writerow(["Frame Index", "Class ID", "Class Name","Track ID", "Confidence", "Time", "XYXY"])
 
                 for frame_index, frame_predictions in results_dict.items():
-                    detection_time = start_time + timedelta(seconds=frame_index/video_fps)
 
                     for prediction in frame_predictions:
                         class_id = prediction["class_id"]
@@ -110,6 +109,14 @@ class ObjectDetection:
                         track_id = prediction["track_id"]
                         conf = prediction["conf"]
                         xyxy = prediction["xyxy"]
+                        detection_time = prediction["time"]
+
+                        # if 'time' in prediction:
+                        #     print(f'time: {prediction["time"]}')
+                        #     detection_time = prediction["time"]
+                        # else:
+                        #     detection_time = 0
+
                         writer.writerow([frame_index, class_id, class_name, track_id, conf, detection_time, xyxy])
 
             logger.info(f'Detection results saved at {file_path}')
@@ -163,12 +170,13 @@ class ObjectDetection:
             video_path=video_path,
             fps=5
         )
-        mot_tracker = Sort() 
+        mot_tracker = Sort()
+        vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
         
         try:
             for frame, frame_idx, video_fps in frame_generator:
-                video_fps = video_fps
+                video_fps = video_fps  # ?
 
                 logger.debug(f'Frame ID: {frame_idx}')
                 # results = self.model.track(source=frame, device='mps')
@@ -180,6 +188,13 @@ class ObjectDetection:
 
                 frame_pred, detections = self.parse_detections(results)
 
+                # add detection time
+                if frame_pred:
+                    detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
+                    frame_pred[0]["time"] = detection_time
+                    logger.debug(f'Detection time: {detection_time}')
+
+                # update tracker
                 track_bbs_ids = mot_tracker.update(detections)
                 if track_bbs_ids.size != 0:
                     track_id = int(track_bbs_ids[0][-1])

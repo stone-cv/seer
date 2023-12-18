@@ -4,15 +4,15 @@ import logging
 
 from logging.handlers import TimedRotatingFileHandler
 
-import config
+import config as cfg
 
 # Create a logger
 logger = logging.getLogger("my_logger")
-logger.setLevel(logging.DEBUG if config.DEBUG else logging.INFO)
+logger.setLevel(logging.DEBUG if cfg.DEBUG else logging.INFO)
 
 # Create a file handler with daily rotation
-os.makedirs(config.log_dir, exist_ok=True)
-log_file = f"{config.log_dir}/log_{datetime.date.today()}.log"
+os.makedirs(cfg.log_dir, exist_ok=True)
+log_file = f"{cfg.log_dir}/log_{datetime.date.today()}.log"
 file_handler = TimedRotatingFileHandler(log_file, when="midnight", interval=1, backupCount=7)
 # file_handler.setLevel(logging.DEBUG if config.DEBUG else logging.INFO)
 

@@ -7,7 +7,7 @@ from time import time
 from datetime import timedelta
 from ultralytics import YOLO
 
-import config
+import config as cfg
 from logger import logger
 from tracker import Sort
 from utils import extract_frame
@@ -95,7 +95,7 @@ class ObjectDetection:
         try:
             # csv file
             start_time, _ = get_time_from_video_path(video_path)
-            file_path = f"{config.results_dir}/{video_path.split('/')[-1].split('.')[0]}.csv"
+            file_path = f"{cfg.results_dir}/{video_path.split('/')[-1].split('.')[0]}.csv"
 
             with open(f'{file_path}', "w", newline="") as file:
                 writer = csv.writer(file)
@@ -192,7 +192,7 @@ class ObjectDetection:
             pass
 
         objects_in_roi = find_class_objects_in_roi(
-            roi_coord=config.camera_1_roi,
+            roi_coord=cfg.camera_1_roi,
             class_id=0,
             result_dict=all_results
         )

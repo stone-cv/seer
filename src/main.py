@@ -1,22 +1,32 @@
+import uvicorn
 from ultralytics import YOLO
+from fastapi import FastAPI
+from fastapi import APIRouter
 
-import config
+import config as cfg
 from logger import logger
 from detector import ObjectDetection
 
 
+app = FastAPI(title="Seer")
+api_router = APIRouter()
+
 def main():
     logger.info('App initiated')
 
-    logger.info('Detection started')
+    # async with bot_engine.begin() as conn:
+    #     await conn.run_sync(Base.metadata.create_all)
+
     detector = ObjectDetection(capture_index=0)
 
     # for video in config.videos:
-    detector(video_path=config.video_path)
+    logger.info('Detection started')
+    detector(video_path=cfg.video_path)
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    uvicorn.run("main:app", port=8000, reload=True)
 
     # model = YOLO("yolov8n.pt")
     # model.predict(

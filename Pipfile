@@ -49,6 +49,9 @@ clearml = "*"
 supervision = "*"
 filterpy = "==1.4.5"
 scikit-image = "*"
+fastapi = "*"
+uvicorn = "*"
+sqlalchemy = "*"
 
 [dev-packages]
 

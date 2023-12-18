@@ -4,7 +4,7 @@ import logging
 
 from logging.handlers import TimedRotatingFileHandler
 
-import config as cfg
+import core.config as cfg
 
 # Create a logger
 logger = logging.getLogger("my_logger")

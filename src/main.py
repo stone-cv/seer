@@ -3,10 +3,10 @@ from ultralytics import YOLO
 from fastapi import FastAPI
 from fastapi import APIRouter
 
-import config as cfg
-from logger import logger
-from detector import ObjectDetection
-from app import app
+import core.config as cfg
+from core.logger import logger
+from detector.detector import ObjectDetection
+from core.app import app
 
 
 # app = FastAPI(title="Seer")

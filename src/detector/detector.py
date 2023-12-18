@@ -7,12 +7,12 @@ from time import time
 from datetime import timedelta
 from ultralytics import YOLO
 
-import config as cfg
-from logger import logger
-from tracker import Sort
-from utils import extract_frame
-from utils import get_time_from_video_path
-from scenarios import find_class_objects_in_roi
+import core.config as cfg
+from core.logger import logger
+from tracker.tracker import Sort
+from core.utils import extract_frame
+from core.utils import get_time_from_video_path
+from core.scenarios import find_class_objects_in_roi
 
 
 class ObjectDetection:

@@ -10,8 +10,8 @@ from sqlalchemy.orm import declarative_base
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import create_async_engine
 
-import config as cfg
-from logger import logger
+import core.config as cfg
+from core.logger import logger
 
 
 # Подключение к базе данных бота

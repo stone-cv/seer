@@ -2,7 +2,7 @@ import cv2
 from typing import Any
 from datetime import datetime
 
-from logger import logger
+from core.logger import logger
 
 
 def extract_frame(video_path: str, fps: int = 5) -> Any:

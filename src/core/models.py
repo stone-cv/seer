@@ -11,8 +11,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import config as config
-from database import Base
+import core.config as config
+from core.database import Base
 # from core.security import fernet_encrypt
 
 

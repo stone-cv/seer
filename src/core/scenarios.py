@@ -1,6 +1,6 @@
 from typing import List
 
-from logger import logger
+from core.logger import logger
 
 
 def find_class_objects_in_roi(roi_coord: List[tuple], class_id: int, result_dict: dict):

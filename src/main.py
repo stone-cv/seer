@@ -6,10 +6,11 @@ from fastapi import APIRouter
 import config as cfg
 from logger import logger
 from detector import ObjectDetection
+from app import app
 
 
-app = FastAPI(title="Seer")
-api_router = APIRouter()
+# app = FastAPI(title="Seer")
+# api_router = APIRouter()
 
 def main():
     logger.info('App initiated')
@@ -25,8 +26,8 @@ def main():
 
 
 if __name__ == '__main__':
-    # main()
-    uvicorn.run("main:app", port=8000, reload=True)
+    main()
+    # uvicorn.run("main:app", port=8000, reload=True)
 
     # model = YOLO("yolov8n.pt")
     # model.predict(

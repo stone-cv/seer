@@ -4,10 +4,10 @@ from logger import logger
 
 
 def find_class_objects_in_roi(roi_coord: List[tuple], class_id: int, result_dict: dict):
-    roi_xmin = roi_coord[0][0]
-    roi_ymin = roi_coord[0][1]
-    roi_xmax = roi_coord[1][0]
-    roi_ymax = roi_coord[1][1]
+    roi_xmin = int(roi_coord[0][0])
+    roi_ymin = int(roi_coord[0][1])
+    roi_xmax = int(roi_coord[1][0])
+    roi_ymax = int(roi_coord[1][1])
 
     # is_in_roi = False
     prior_track_ids = []

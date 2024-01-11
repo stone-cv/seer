@@ -206,7 +206,7 @@ class ObjectDetection:
             fps=5
         )
         # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-        tracker = Tracker()
+        # tracker = Tracker()
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
         
@@ -216,7 +216,14 @@ class ObjectDetection:
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
 
                 logger.debug(f'Frame ID: {frame_idx}')
-                results = self.model.track(source=frame, device='mps')
+                results = self.model.track(
+                    source=frame,
+                    persist=True,
+                    conf=0.5,
+                    iou=0.5,
+                    device='mps',
+                    show=True
+                )
                 # results = self.predict_custom(
                 #     frame=frame
                 # )

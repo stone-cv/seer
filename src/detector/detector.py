@@ -96,13 +96,14 @@ class ObjectDetection:
                     class_id = boxes.cls[0].astype(int)
                     conf = boxes.conf[0].astype(float)
                     xyxy = boxes.xyxy[0].tolist()
-                    # track_id = boxes.id[0].astype(int)
+                    track_id = boxes.id[0].astype(int)
                     logger.debug(f'class_id: {class_id} ({type(class_id)}), conf: {conf} ({type(conf)}), xyxy: {xyxy} ({type(xyxy)})')
 
                     prediction = {
                         "class_id": int(class_id),
                         "class_name": self.CLASS_NAMES_DICT[class_id],
-                        "track_id": 0,  # ?
+                        # "track_id": 0,
+                        "track_id": int(track_id),
                         "conf": round(float(conf), 2),  # invalid format for json
                         "time": 0,
                         "xyxy": xyxy
@@ -198,7 +199,6 @@ class ObjectDetection:
         return frame
     
     
-    
     def __call__(self, video_path):
 
         frame_generator = extract_frame(
@@ -216,10 +216,10 @@ class ObjectDetection:
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
 
                 logger.debug(f'Frame ID: {frame_idx}')
-                # results = self.model.track(source=frame, device='mps')
-                results = self.predict_custom(
-                    frame=frame
-                )
+                results = self.model.track(source=frame, device='mps')
+                # results = self.predict_custom(
+                #     frame=frame
+                # )
                 # detections = np.empty((0, 5))
 
                 for result in results:
@@ -240,22 +240,25 @@ class ObjectDetection:
                             # track_id = int(track_bbs_ids[0][-1])
         
                         # deep_sort
-                        tracker.update(frame, detections)
-                        for track in tracker.tracks:
-                            track_id = track.track_id
-                            item["track_id"] = track_id
-                            logger.debug(f'Track ID: {track_id}')
+                        # tracker.update(frame, detections)
+                        # for track in tracker.tracks:
+                        #     track_id = track.track_id
+                        #     item["track_id"] = track_id
+                        #     logger.debug(f'Track ID: {track_id}')
 
                     all_results[frame_idx] = frame_pred
 
         except StopIteration:
             pass
 
-        objects_in_roi = find_class_objects_in_roi(
+        objects_in_roi = []
+        # for class_id in self.CLASS_NAMES_DICT.keys():
+        objects = find_class_objects_in_roi(
             roi_coord=cfg.camera_1_roi,
-            class_id=0,
+            class_id=0,  # stone class id
             result_dict=all_results
         )
+        objects_in_roi.extend(objects)
 
         for item in objects_in_roi:
             last_detection_time = get_event_end_time(all_results, item['track_id'])

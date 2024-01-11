@@ -163,7 +163,7 @@ venv/
 runs/
 static/
 results/
-deep_sort/
+# deep_sort/
 datasets/
 .DS_Store
 *.pt

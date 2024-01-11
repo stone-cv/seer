@@ -11,7 +11,8 @@ from sklearn.model_selection import train_test_split
 
 import core.config as cfg
 from core.logger import logger
-from tracker.tracker import Sort
+# from tracker.tracker import Sort
+from tracker.tracker_dpsort import Tracker
 # from core.models import Event
 from core.utils import extract_frame
 from core.utils import get_time_from_video_path
@@ -204,7 +205,8 @@ class ObjectDetection:
             video_path=video_path,
             fps=5
         )
-        tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
+        # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
+        tracker = Tracker()
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
         
@@ -230,9 +232,12 @@ class ObjectDetection:
                         logger.debug(f'Detection time: {detection_time}')
 
                     # update tracker
-                    track_bbs_ids = tracker.update(detections)
-                    if track_bbs_ids.size != 0:
-                        track_id = int(track_bbs_ids[0][-1])
+                    # track_bbs_ids = tracker.update(detections)
+                    # if track_bbs_ids.size != 0:
+                        # track_id = int(track_bbs_ids[0][-1])
+                    tracker.update(frame, detections)
+                    for track in tracker.tracks:
+                        track_id = track.track_id
                         frame_pred[0]["track_id"] = track_id
                         logger.debug(f'Track ID: {track_id}')
 

@@ -6,6 +6,8 @@ import supervision as sv
 from time import time
 from datetime import timedelta
 from ultralytics import YOLO
+from clearml import Task
+from sklearn.model_selection import train_test_split
 
 import core.config as cfg
 from core.logger import logger
@@ -36,18 +38,48 @@ class ObjectDetection:
 
     def load_model(self):
        
-        model = YOLO("yolov8n.pt")  # load a pretrained YOLOv8n model
+        # model = YOLO("yolov8m.pt")  # load a pretrained YOLOv8n model
+        model = YOLO("best.pt")
         model.fuse()
     
         return model
+    
+
+    def train_custom(self, data):
+
+        # train_X, val_X, train_y, val_y = train_test_split(X_shuffled, y_shuffled, test_size=0.2, random_state=42)
+
+        task = Task.init(project_name="stone-cv", task_name="training02")
+
+        results = self.model.train(
+            data=data,
+            epochs=10,
+            batch=8,
+            device='mps'
+        )
+
+        return results
 
 
-    def predict(self, frame):
+    def predict_custom(self, frame):
 
         results = self.model(
             source=frame,
             device=self.device,
             conf=0.5
+        )
+        
+        return results
+    
+
+    def predict_vid_showcase(self, video_path):
+
+        results = self.model.predict(
+        source=video_path,
+        show=True,
+        save=True,
+        save_txt=True,
+        device="mps",
         )
         
         return results
@@ -172,7 +204,7 @@ class ObjectDetection:
             video_path=video_path,
             fps=5
         )
-        mot_tracker = Sort()
+        tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
         
@@ -182,42 +214,43 @@ class ObjectDetection:
 
                 logger.debug(f'Frame ID: {frame_idx}')
                 # results = self.model.track(source=frame, device='mps')
-                results = self.model.predict(  # from this model or general ?
-                    source=frame,
-                    device=self.device,
-                    conf=0.5
+                results = self.predict_custom(
+                    frame=frame
                 )
+                # detections = np.empty((0, 5))
 
-                frame_pred, detections = self.parse_detections(results)
+                for result in results:
+                    frame_pred, detections = self.parse_detections(result)
+                    print(f'\n\n\n\nresults: {detections}\n\n\n\n')
 
-                # add detection time
-                if frame_pred:
-                    detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
-                    frame_pred[0]["time"] = detection_time
-                    logger.debug(f'Detection time: {detection_time}')
+                    # add detection time
+                    if frame_pred:
+                        detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
+                        frame_pred[0]["time"] = detection_time
+                        logger.debug(f'Detection time: {detection_time}')
 
-                # update tracker
-                track_bbs_ids = mot_tracker.update(detections)
-                if track_bbs_ids.size != 0:
-                    track_id = int(track_bbs_ids[0][-1])
-                    frame_pred[0]["track_id"] = track_id
-                    logger.debug(f'Track ID: {track_id}')
+                    # update tracker
+                    track_bbs_ids = tracker.update(detections)
+                    if track_bbs_ids.size != 0:
+                        track_id = int(track_bbs_ids[0][-1])
+                        frame_pred[0]["track_id"] = track_id
+                        logger.debug(f'Track ID: {track_id}')
 
-                all_results[frame_idx] = frame_pred
+                    all_results[frame_idx] = frame_pred
 
         except StopIteration:
             pass
 
-        objects_in_roi = find_class_objects_in_roi(
-            roi_coord=cfg.camera_1_roi,
-            class_id=0,
-            result_dict=all_results
-        )
+        # objects_in_roi = find_class_objects_in_roi(
+        #     roi_coord=cfg.camera_1_roi,
+        #     class_id=0,
+        #     result_dict=all_results
+        # )
 
-        for item in objects_in_roi:
-            last_detection_time = get_event_end_time(all_results, item['track_id'])
-            item['last_detection_time'] = last_detection_time
-            logger.debug(f'Objects in ROI: {objects_in_roi}')
+        # for item in objects_in_roi:
+        #     last_detection_time = get_event_end_time(all_results, item['track_id'])
+        #     item['last_detection_time'] = last_detection_time
+        #     logger.debug(f'Objects in ROI: {objects_in_roi}')
 
             # event = Event(
             #     type_id = 0,  # create event types

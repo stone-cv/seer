@@ -163,6 +163,8 @@ venv/
 runs/
 static/
 results/
+deep_sort/
+datasets/
 .DS_Store
 *.pt
 *.onnx
@@ -170,3 +172,6 @@ results/
 *.jpg
 *.csv
 *.yaml
+*.pb
+*.meta
+*.ckpt*

@@ -35,7 +35,8 @@ def find_class_objects_in_roi(roi_coord: List[tuple], class_id: int, result_dict
 
 def get_event_end_time(events: dict, track_id: int):
 
-    last_detection_time = datetime.strptime("01.01.1970 00:00:00", "%d.%m.%Y %H:%M:%S")  # Initialize with a value lower than the minimum time
+    # Initialize with a value lower than the minimum time
+    last_detection_time = datetime.strptime("01.01.1970 00:00:00", "%d.%m.%Y %H:%M:%S")
     for _, values in events.items():
         for item in values:
             if item["track_id"] == track_id:

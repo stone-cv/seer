@@ -213,6 +213,7 @@ class ObjectDetection:
         try:
             for frame, frame_idx, video_fps in frame_generator:
                 video_fps = video_fps  # ?
+                detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
 
                 logger.debug(f'Frame ID: {frame_idx}')
                 # results = self.model.track(source=frame, device='mps')
@@ -226,36 +227,40 @@ class ObjectDetection:
                     print(f'\n\n\n\nresults: {detections}\n\n\n\n')
 
                     # add detection time
-                    if frame_pred:
-                        detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
-                        frame_pred[0]["time"] = detection_time
+                    # if frame_pred:
+                    for item in frame_pred:
+                        item["time"] = detection_time
                         logger.debug(f'Detection time: {detection_time}')
 
-                    # update tracker
-                    # track_bbs_ids = tracker.update(detections)
-                    # if track_bbs_ids.size != 0:
-                        # track_id = int(track_bbs_ids[0][-1])
-                    tracker.update(frame, detections)
-                    for track in tracker.tracks:
-                        track_id = track.track_id
-                        frame_pred[0]["track_id"] = track_id
-                        logger.debug(f'Track ID: {track_id}')
+                        # update tracker
+
+                        # sort
+                        # track_bbs_ids = tracker.update(detections)
+                        # if track_bbs_ids.size != 0:
+                            # track_id = int(track_bbs_ids[0][-1])
+        
+                        # deep_sort
+                        tracker.update(frame, detections)
+                        for track in tracker.tracks:
+                            track_id = track.track_id
+                            item["track_id"] = track_id
+                            logger.debug(f'Track ID: {track_id}')
 
                     all_results[frame_idx] = frame_pred
 
         except StopIteration:
             pass
 
-        # objects_in_roi = find_class_objects_in_roi(
-        #     roi_coord=cfg.camera_1_roi,
-        #     class_id=0,
-        #     result_dict=all_results
-        # )
+        objects_in_roi = find_class_objects_in_roi(
+            roi_coord=cfg.camera_1_roi,
+            class_id=0,
+            result_dict=all_results
+        )
 
-        # for item in objects_in_roi:
-        #     last_detection_time = get_event_end_time(all_results, item['track_id'])
-        #     item['last_detection_time'] = last_detection_time
-        #     logger.debug(f'Objects in ROI: {objects_in_roi}')
+        for item in objects_in_roi:
+            last_detection_time = get_event_end_time(all_results, item['track_id'])
+            item['last_detection_time'] = last_detection_time
+        logger.debug(f'Objects in ROI: {objects_in_roi}')
 
             # event = Event(
             #     type_id = 0,  # create event types

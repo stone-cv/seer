@@ -1,3 +1,5 @@
+import numpy as np
+
 from datetime import datetime
 from typing import List
 
@@ -44,3 +46,45 @@ def get_event_end_time(events: dict, track_id: int):
                     last_detection_time = item["time"]
 
     return last_detection_time
+
+
+# Calculate Motion
+def calculate_motion(prev_bbox, curr_bbox):
+
+    prev_center = calculate_center(prev_bbox)
+    curr_center = calculate_center(curr_bbox)
+
+    motion = curr_center - prev_center
+
+    return motion
+
+def calculate_center(bbox):
+
+    x, y, w, h = bbox
+    center_x = x + (w / 2)
+    center_y = y + (h / 2)
+
+    logger.debug(f'Center: {center_x}, {center_y}')
+    return np.array([center_x, center_y])
+
+# Threshold for Movement
+def is_moving(motion, threshold):
+
+    magnitude = np.linalg.norm(motion)
+    logger.debug(f'Saw magnitude: {magnitude}')
+    in_motion = magnitude > threshold
+
+    if in_motion:
+        print("Saw is moving from side to side.")
+    else:
+        print("Saw is stationary.")
+
+    return in_motion
+
+# # Decision Making
+# def make_decision(moving):
+
+#     if moving:
+#         print("Saw is moving from side to side.")
+#     else:
+#         print("Saw is stationary.")

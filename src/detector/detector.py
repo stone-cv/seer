@@ -5,6 +5,7 @@ import supervision as sv
 
 from time import time
 from datetime import timedelta
+from collections import defaultdict
 from ultralytics import YOLO
 from clearml import Task
 from sklearn.model_selection import train_test_split
@@ -18,6 +19,9 @@ from core.utils import extract_frame
 from core.utils import get_time_from_video_path
 from core.scenarios import find_class_objects_in_roi
 from core.scenarios import get_event_end_time
+from core.scenarios import calculate_motion
+from core.scenarios import calculate_center
+from core.scenarios import is_moving
 
 
 class ObjectDetection:
@@ -96,6 +100,7 @@ class ObjectDetection:
                     class_id = boxes.cls[0].astype(int)
                     conf = boxes.conf[0].astype(float)
                     xyxy = boxes.xyxy[0].tolist()
+                    xywh = boxes.xywh[0].tolist()
                     track_id = boxes.id[0].astype(int)
                     logger.debug(f'class_id: {class_id} ({type(class_id)}), conf: {conf} ({type(conf)}), xyxy: {xyxy} ({type(xyxy)})')
 
@@ -106,7 +111,8 @@ class ObjectDetection:
                         "track_id": int(track_id),
                         "conf": round(float(conf), 2),  # invalid format for json
                         "time": 0,
-                        "xyxy": xyxy
+                        "xyxy": xyxy,
+                        "xywh": xywh
                     }
                     frame_pred.append(prediction)
 
@@ -135,7 +141,7 @@ class ObjectDetection:
 
             with open(f'{file_path}', "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(["Frame Index", "Class ID", "Class Name","Track ID", "Confidence", "Time", "XYXY"])
+                writer.writerow(["Frame Index", "Class ID", "Class Name","Track ID", "Confidence", "Time", "XYXY", "XYWH"])
 
                 for frame_index, frame_predictions in results_dict.items():
 
@@ -145,6 +151,7 @@ class ObjectDetection:
                         track_id = prediction["track_id"]
                         conf = prediction["conf"]
                         xyxy = prediction["xyxy"]
+                        xywh = prediction["xywh"]
                         detection_time = prediction["time"]
 
                         # if 'time' in prediction:
@@ -153,7 +160,7 @@ class ObjectDetection:
                         # else:
                         #     detection_time = 0
 
-                        writer.writerow([frame_index, class_id, class_name, track_id, conf, detection_time, xyxy])
+                        writer.writerow([frame_index, class_id, class_name, track_id, conf, detection_time, xyxy, xywh])
 
             logger.info(f'Detection results saved at {file_path}')
 
@@ -209,10 +216,10 @@ class ObjectDetection:
         # tracker = Tracker()
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
+        track_history = defaultdict(lambda: [])
         
         try:
             for frame, frame_idx, video_fps in frame_generator:
-                video_fps = video_fps  # ?
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
 
                 logger.debug(f'Frame ID: {frame_idx}')
@@ -222,8 +229,10 @@ class ObjectDetection:
                     conf=0.5,
                     iou=0.5,
                     device='mps',
+                    # tracker="bytetrack.yaml",
                     show=True
                 )
+
                 # results = self.predict_custom(
                 #     frame=frame
                 # )
@@ -231,13 +240,31 @@ class ObjectDetection:
 
                 for result in results:
                     frame_pred, detections = self.parse_detections(result)
-                    print(f'\n\n\n\nresults: {detections}\n\n\n\n')
 
                     # add detection time
                     # if frame_pred:
                     for item in frame_pred:
                         item["time"] = detection_time
                         logger.debug(f'Detection time: {detection_time}')
+
+                        # saw motion logic
+                        if item['class_id'] == 1:
+                            track_id = item["track_id"]
+                            # x, y, w, h = item['xywh']
+                            track = track_history[track_id]
+                            track.append(item['xywh'])  # x, y center point
+
+                            if len(track) > 1:
+                                motion = calculate_motion(
+                                    prev_bbox=track[-2],
+                                    curr_bbox=track[-1]
+                                )
+                                in_motion = is_moving(motion=motion, threshold=1.5)
+
+                                # if in_motion: create an event
+
+                            # if len(track) > 30:  # retain 90 tracks for 90 frames
+                            #     track.pop(0)
 
                         # update tracker
 
@@ -253,6 +280,7 @@ class ObjectDetection:
                         #     item["track_id"] = track_id
                         #     logger.debug(f'Track ID: {track_id}')
 
+                    print(f'\n\n\n\nresults: {frame_pred}\n\n\n\n')
                     all_results[frame_idx] = frame_pred
 
         except StopIteration:

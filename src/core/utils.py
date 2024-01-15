@@ -25,7 +25,7 @@ def extract_frame(video_path: str, fps: int = 5) -> Any:
             break
         if frame_idx % frame_interval == 0:
             frame_count += 1
-            yield frame, frame_idx, video_fps
+            yield frame, frame_idx, video_fps, fps
         frame_idx += 1
 
     video.release()

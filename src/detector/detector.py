@@ -112,7 +112,8 @@ class ObjectDetection:
                         "conf": round(float(conf), 2),  # invalid format for json
                         "time": 0,
                         "xyxy": xyxy,
-                        "xywh": xywh
+                        "xywh": xywh,
+                        "saw_moving": None
                     }
                     frame_pred.append(prediction)
 
@@ -141,7 +142,7 @@ class ObjectDetection:
 
             with open(f'{file_path}', "w", newline="") as file:
                 writer = csv.writer(file)
-                writer.writerow(["Frame Index", "Class ID", "Class Name","Track ID", "Confidence", "Time", "XYXY", "XYWH"])
+                writer.writerow(["Frame Index", "Class ID", "Class Name","Track ID", "Confidence", "Time", "XYXY", "XYWH", 'saw_moving'])
 
                 for frame_index, frame_predictions in results_dict.items():
 
@@ -153,6 +154,7 @@ class ObjectDetection:
                         xyxy = prediction["xyxy"]
                         xywh = prediction["xywh"]
                         detection_time = prediction["time"]
+                        saw_moving = prediction["saw_moving"]
 
                         # if 'time' in prediction:
                         #     print(f'time: {prediction["time"]}')
@@ -160,7 +162,7 @@ class ObjectDetection:
                         # else:
                         #     detection_time = 0
 
-                        writer.writerow([frame_index, class_id, class_name, track_id, conf, detection_time, xyxy, xywh])
+                        writer.writerow([frame_index, class_id, class_name, track_id, conf, detection_time, xyxy, xywh, saw_moving])
 
             logger.info(f'Detection results saved at {file_path}')
 
@@ -217,9 +219,10 @@ class ObjectDetection:
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
         track_history = defaultdict(lambda: [])
+        track_magn = 0
         
         try:
-            for frame, frame_idx, video_fps in frame_generator:
+            for frame, frame_idx, video_fps, curr_fps in frame_generator:
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
 
                 logger.debug(f'Frame ID: {frame_idx}')
@@ -244,24 +247,37 @@ class ObjectDetection:
                     # add detection time
                     # if frame_pred:
                     for item in frame_pred:
-                        item["time"] = detection_time
+                        item['time'] = detection_time
                         logger.debug(f'Detection time: {detection_time}')
 
                         # saw motion logic
                         if item['class_id'] == 1:
-                            track_id = item["track_id"]
+                            track_id = item['track_id']
                             # x, y, w, h = item['xywh']
                             track = track_history[track_id]
                             track.append(item['xywh'])  # x, y center point
 
                             if len(track) > 1:
-                                motion = calculate_motion(
-                                    prev_bbox=track[-2],
-                                    curr_bbox=track[-1]
-                                )
-                                in_motion = is_moving(motion=motion, threshold=1.5)
+                                if len(track) < curr_fps*10:  # fps from generator for 10 seconds (video_fps*10)
+                                # while len(track) < video_fps*10:  # 10 seconds
+                                    magnitude = calculate_motion(
+                                        prev_bbox=track[-2],
+                                        curr_bbox=track[-1]
+                                    )
+                                    track_magn += magnitude
+                                else:
+                                    logger.debug(f'Magnitude: {track_magn}')
+                                    in_motion = is_moving(magnitude=track_magn, threshold=70)
 
-                                # if in_motion: create an event
+                                    if in_motion:  # create an event
+                                        item['saw_moving'] = True
+                                        logger.info('\n\n\nITS MOVINGGGGGG\n\n\n')
+                                    else:
+                                        item['saw_moving'] = False
+                                        logger.info('\n\n\nITS STATIONARYYYY\n\n\n')
+
+                                    track_magn = 0
+                                    track.clear()
 
                             # if len(track) > 30:  # retain 90 tracks for 90 frames
                             #     track.pop(0)
@@ -280,7 +296,7 @@ class ObjectDetection:
                         #     item["track_id"] = track_id
                         #     logger.debug(f'Track ID: {track_id}')
 
-                    print(f'\n\n\n\nresults: {frame_pred}\n\n\n\n')
+                    logger.debug(f'results: {frame_pred}')
                     all_results[frame_idx] = frame_pred
 
         except StopIteration:

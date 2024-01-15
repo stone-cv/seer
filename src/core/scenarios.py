@@ -55,8 +55,9 @@ def calculate_motion(prev_bbox, curr_bbox):
     curr_center = calculate_center(curr_bbox)
 
     motion = curr_center - prev_center
+    magnitude = np.linalg.norm(motion)
 
-    return motion
+    return magnitude
 
 def calculate_center(bbox):
 
@@ -68,9 +69,8 @@ def calculate_center(bbox):
     return np.array([center_x, center_y])
 
 # Threshold for Movement
-def is_moving(motion, threshold):
+def is_moving(magnitude, threshold):
 
-    magnitude = np.linalg.norm(motion)
     logger.debug(f'Saw magnitude: {magnitude}')
     in_motion = magnitude > threshold
 

@@ -26,6 +26,13 @@ results_dir = config['Application']['results_dir']
 video_path = config['Application']['video_path']
 camera_1_roi = config['Application']['camera_1_roi']
 
+# saw logic
+saw_moving_sec = config['Saw_logic']['saw_moving_sec']
+saw_moving_threshold = config['Saw_logic']['saw_moving_threshold']
+
+# stone logic
+stone_check_sec = config['Stone_logic']['stone_check_sec']
+
 # Database
 # bot_db_host = config.get('Bot_Database', 'host')
 # bot_db_port = config.get('Bot_Database', 'port')

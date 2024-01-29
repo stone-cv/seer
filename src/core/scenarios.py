@@ -65,26 +65,44 @@ def calculate_center(bbox):
     center_x = x + (w / 2)
     center_y = y + (h / 2)
 
-    logger.debug(f'Center: {center_x}, {center_y}')
+    logger.debug(f'BBox center: {center_x}, {center_y}')
     return np.array([center_x, center_y])
 
 # Threshold for Movement
-def is_moving(magnitude, threshold):
+def is_moving(magnitude, threshold):  # necessary?
 
-    logger.debug(f'Saw magnitude: {magnitude}')
     in_motion = magnitude > threshold
-
-    if in_motion:
-        print("Saw is moving from side to side.")
-    else:
-        print("Saw is stationary.")
 
     return in_motion
 
-# # Decision Making
-# def make_decision(moving):
 
-#     if moving:
-#         print("Saw is moving from side to side.")
-#     else:
-#         print("Saw is stationary.")
+# def check_for_motion(track_history, item, track_magn, already_moving, curr_fps, detection_time):
+#     track_history.append(item['xywh'])
+
+#     if len(track) > 1:
+#         if len(track) < curr_fps*10:  # fps from frame_generator x 10 seconds
+#             magnitude = calculate_motion(
+#                 prev_bbox=track[-2],
+#                 curr_bbox=track[-1]
+#             )
+#             track_magn += magnitude
+#         else:
+#             logger.debug(f'Magnitude: {track_magn}')
+#             in_motion = is_moving(magnitude=track_magn, threshold=70)
+
+#             item['saw_moving'] = in_motion
+#             logger.debug(f'Saw moving: {in_motion}')
+
+#             if in_motion and not already_moving:
+#                 already_moving = True
+#                 # create an event
+#                 logger.info(f'The saw started moving at {detection_time}')
+
+#             elif not in_motion and already_moving:
+#                 already_moving = False
+#                 # create an event
+#                 logger.info(f'The saw stopped moving at {detection_time}')
+
+#             # clear history
+#             track_magn = 0
+#             track.clear()

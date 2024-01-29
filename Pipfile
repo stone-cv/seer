@@ -52,7 +52,7 @@ scikit-image = "*"
 fastapi = "*"
 uvicorn = "*"
 sqlalchemy = "*"
-scikit-learn = "==0.21"
+scikit-learn = "*"
 tensorflow = "*"
 
 [dev-packages]

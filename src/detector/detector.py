@@ -218,12 +218,20 @@ class ObjectDetection:
         # tracker = Tracker()
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
-        track_history = defaultdict(lambda: [])
-        track_magn = 0
+
+        # saw_track_history = defaultdict(lambda: [])
+        track = []
+        saw_track_magn = 0
+        already_moving = False
+
+        stone_already_present = False
+        class_ids = []
+        stone_history = []
         
         try:
             for frame, frame_idx, video_fps, curr_fps in frame_generator:
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
+                logger.debug(f'Detection time: {detection_time}')
 
                 logger.debug(f'Frame ID: {frame_idx}')
                 results = self.model.track(
@@ -244,43 +252,74 @@ class ObjectDetection:
                 for result in results:
                     frame_pred, detections = self.parse_detections(result)
 
-                    # add detection time
-                    # if frame_pred:
                     for item in frame_pred:
                         item['time'] = detection_time
-                        logger.debug(f'Detection time: {detection_time}')
+                        class_ids.append(item['class_id'])
 
                         # saw motion logic
-                        if item['class_id'] == 1:
-                            track_id = item['track_id']
-                            # x, y, w, h = item['xywh']
-                            track = track_history[track_id]
-                            track.append(item['xywh'])  # x, y center point
+                        if item['class_id'] == 1:  # saw class id
+                            # track_id = item['track_id']
+                            # track = saw_track_history[track_id]
+                            track.append(item['xywh'])
 
                             if len(track) > 1:
-                                if len(track) < curr_fps*10:  # fps from generator for 10 seconds (video_fps*10)
-                                # while len(track) < video_fps*10:  # 10 seconds
+                                if len(track) < curr_fps * cfg.saw_moving_sec:  # fps from frame_generator x 10 seconds
                                     magnitude = calculate_motion(
                                         prev_bbox=track[-2],
                                         curr_bbox=track[-1]
                                     )
-                                    track_magn += magnitude
+                                    saw_track_magn += magnitude
                                 else:
-                                    logger.debug(f'Magnitude: {track_magn}')
-                                    in_motion = is_moving(magnitude=track_magn, threshold=70)
+                                    logger.debug(f'Magnitude: {saw_track_magn}')
+                                    in_motion = is_moving(
+                                        magnitude=saw_track_magn,
+                                        threshold=cfg.saw_moving_threshold
+                                    )
 
-                                    if in_motion:  # create an event
-                                        item['saw_moving'] = True
-                                        logger.info('\n\n\nITS MOVINGGGGGG\n\n\n')
-                                    else:
-                                        item['saw_moving'] = False
-                                        logger.info('\n\n\nITS STATIONARYYYY\n\n\n')
+                                    item['saw_moving'] = in_motion
+                                    logger.debug(f'Saw moving: {in_motion}')
 
-                                    track_magn = 0
+                                    if in_motion and not already_moving:
+                                        already_moving = True
+                                        # create an event
+                                        logger.info(f'The saw started moving at {detection_time}')
+
+                                    elif not in_motion and already_moving:
+                                        already_moving = False
+                                        # create an event
+                                        logger.info(f'The saw stopped moving at {detection_time}')
+
+                                    # clear history
+                                    saw_track_magn = 0
                                     track.clear()
 
-                            # if len(track) > 30:  # retain 90 tracks for 90 frames
-                            #     track.pop(0)
+                    # stone logic
+                    logger.debug(f'Class IDs: {class_ids}')
+                    if 0 in class_ids:  # stone class id
+                        stone_history.append(True)
+                    else:
+                        stone_history.append(False)
+                    class_ids.clear()
+                    
+                    logger.debug(f'Stone history: {stone_history}')
+                    if len(stone_history) >= curr_fps * cfg.stone_check_sec:
+                        true_count = stone_history.count(True)
+                        if true_count > len(stone_history) // 2:
+                            stone_present = True
+                        else:
+                            stone_present = False
+                        
+                        if stone_present and not stone_already_present:
+                            stone_already_present = True
+                            # create an event
+                            logger.info(f'New stone detected at {detection_time}')
+
+                        elif not stone_present and stone_already_present:
+                            stone_already_present = False
+                            # create an event
+                            logger.info(f'Stone removed at {detection_time}')
+
+                        stone_history.clear()
 
                         # update tracker
 

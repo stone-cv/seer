@@ -1,3 +1,4 @@
+import asyncio
 import time
 import uvicorn
 from ultralytics import YOLO
@@ -5,22 +6,26 @@ from fastapi import FastAPI
 from fastapi import APIRouter
 
 import core.config as cfg
+from core.database import Base, db_engine
 from core.logger import logger
 from detector.detector import ObjectDetection
 from core.app import app
+from core.models import *
 
 
 # app = FastAPI(title="Seer")
 # api_router = APIRouter()
 
-def main():
+async def main():
     logger.info('App initiated')
 
     t = time.localtime()
     current_time = time.strftime("%H:%M:%S", t)
 
-    # async with bot_engine.begin() as conn:
-    #     await conn.run_sync(Base.metadata.create_all)
+    async with db_engine.begin() as conn:
+        # await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info('DB metadata created')
 
     detector = ObjectDetection(capture_index=0)
 
@@ -31,12 +36,11 @@ def main():
 
     # for video in config.videos:
     logger.info('Detection started')
-    detector(video_path=cfg.video_path)
-    # detector.predict_vid_showcase(video_path=cfg.video_path)
+    # detector(video_path=cfg.video_path)
 
 
 if __name__ == '__main__':
-    main()
+    asyncio.run(main())
     # uvicorn.run("main:app", port=8000, reload=True)
 
     # model = YOLO("yolov8n.pt")

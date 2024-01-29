@@ -34,17 +34,8 @@ saw_moving_threshold = config['Saw_logic']['saw_moving_threshold']
 stone_check_sec = config['Stone_logic']['stone_check_sec']
 
 # Database
-# bot_db_host = config.get('Bot_Database', 'host')
-# bot_db_port = config.get('Bot_Database', 'port')
-# bot_db_name = config.get('Bot_Database', 'db_name')
-# bot_db_login = config.get('Bot_Database', 'login')
-# bot_db_password = config.get('Bot_Database', 'password')
-
-# bot_db_URI = PostgresDsn.build(
-#     scheme='postgresql+asyncpg',
-#     user=bot_db_login,
-#     password=bot_db_password,
-#     host=bot_db_host,
-#     port=bot_db_port,
-#     path=f"/{bot_db_name}"
-# )
+db_host = config['Database']['db_host']
+db_port = config['Database']['db_port']
+db_name = config['Database']['db_name']
+db_login = config['Database']['db_login']
+db_password = config['Database']['db_password']

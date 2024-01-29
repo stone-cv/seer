@@ -9,6 +9,7 @@ from sqlalchemy import ForeignKey
 from sqlalchemy.orm import Mapped
 from sqlalchemy.orm import mapped_column
 from sqlalchemy.orm import relationship
+from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import Base
@@ -26,23 +27,61 @@ class Event(Base):
     camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"))
     camera: Mapped['Camera'] = relationship(back_populates="event")
 
-    camera_roi_id: Mapped[int] = mapped_column(ForeignKey("camera_rois.id"))
-    camera_roi: Mapped['RegionOfInterest'] = relationship(back_populates="event")
+    # camera_roi_id: Mapped[int] = mapped_column(ForeignKey("camera_rois.id"))
+    # camera_roi: Mapped['RegionOfInterest'] = relationship(back_populates="event")
 
-    start_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
-    end_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
+    time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
+    # start_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
+    # end_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    # @staticmethod
-    # async def client_get_by_name(
-    #     db_session: AsyncSession, name: str
-    # ) -> "ClientDatabase":
-    #     result = await db_session.execute(
-    #         select(ClientDatabase).filter(ClientDatabase.name == name)
-    #     )
+    @staticmethod
+    async def event_create(
+        *,
+        db_session: AsyncSession,
+        name: str
+    ) -> 'Event':
 
-    #     return result.scalars().first()
+        event = await db_session.execute(
+            select(Event)
+            .filter(
+                Event.name == name
+            )
+        )
+
+        event = event.scalars().first()
+
+        if event is None:
+            event = Event(
+                name=name
+            )
+        else:
+            event.deleted = False
+
+        db_session.add(event)
+        await db_session.commit()
+
+        return event
+
+    @staticmethod
+    async def event_delete(
+        *,
+        db_session: AsyncSession,
+        id_group: int
+    ) -> 'Event':
+
+        event = await db_session.execute(
+            select(Event).filter(
+                Event.id == id_group
+            )
+        )
+
+        event = event.scalars().first()
+        event.deleted = True
+        await db_session.commit()
+
+        return event
 
 
 class EventType(Base):
@@ -71,15 +110,15 @@ class Camera(Base):
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
-class RegionOfInterest(Base):
-    __tablename__ = "roi_zones"
+# class RegionOfInterest(Base):
+#     __tablename__ = "roi_zones"
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String(255))
-    coords: Mapped[str] = mapped_column(String(255))
+#     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+#     name: Mapped[str] = mapped_column(String(255))
+#     coords: Mapped[str] = mapped_column(String(255))
 
-    event: Mapped['Event'] = relationship(back_populates="camera_roi")
+#     event: Mapped['Event'] = relationship(back_populates="camera_roi")
 
-    # event: Mapped['Event'] = relationship(back_populates="event_type")  # ?
+#     # event: Mapped['Event'] = relationship(back_populates="event_type")  # ?
 
-    deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+#     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

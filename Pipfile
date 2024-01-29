@@ -54,6 +54,8 @@ uvicorn = "*"
 sqlalchemy = "*"
 scikit-learn = "*"
 tensorflow = "*"
+asyncpg = "*"
+greenlet = "*"
 
 [dev-packages]
 

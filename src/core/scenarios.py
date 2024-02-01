@@ -6,6 +6,26 @@ from typing import List
 from core.logger import logger
 
 
+def is_in_roi(roi_xyxy: List[tuple], object_xyxy: list) -> bool:
+    roi_xmin = int(roi_xyxy[0][0])
+    roi_ymin = int(roi_xyxy[0][1])
+    roi_xmax = int(roi_xyxy[1][0])
+    roi_ymax = int(roi_xyxy[1][1])
+
+    xmin, ymin, xmax, ymax = object_xyxy
+
+    is_in_roi = False
+
+    # Check if the bounding box intersects or lies within the ROI
+    if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
+        is_in_roi = True
+        logger.debug(f"The object detected is in the ROI")
+    else:
+        logger.debug(f"The object is detected not in the ROI")
+
+    return is_in_roi
+
+
 def find_class_objects_in_roi(roi_coord: List[tuple], class_id: int, result_dict: dict):
     roi_xmin = int(roi_coord[0][0])
     roi_ymin = int(roi_coord[0][1])

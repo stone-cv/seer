@@ -22,10 +22,10 @@ async def main():
     t = time.localtime()
     current_time = time.strftime("%H:%M:%S", t)
 
-    async with db_engine.begin() as conn:
+    # async with db_engine.begin() as conn:
         # await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info('DB metadata created')
+        # await conn.run_sync(Base.metadata.create_all)
+        # logger.info('DB metadata created')
 
     detector = ObjectDetection(capture_index=0)
 
@@ -36,7 +36,7 @@ async def main():
 
     # for video in config.videos:
     logger.info('Detection started')
-    # detector(video_path=cfg.video_path)
+    await detector(video_path=cfg.video_path)
 
 
 if __name__ == '__main__':

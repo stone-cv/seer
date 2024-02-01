@@ -1,4 +1,5 @@
 import yaml
+import datetime
 from typing import Optional
 
 from sqlalchemy import Integer
@@ -21,7 +22,7 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
-    type_id: Mapped[int] = mapped_column(ForeignKey("event_types.id"))
+    type_id: Mapped[int] = mapped_column(ForeignKey("event_types.id"))  # 'operation' as per api
     event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
 
     camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"))
@@ -30,9 +31,11 @@ class Event(Base):
     # camera_roi_id: Mapped[int] = mapped_column(ForeignKey("camera_rois.id"))
     # camera_roi: Mapped['RegionOfInterest'] = relationship(back_populates="event")
 
-    time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
-    # start_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
-    # end_time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp?
+    time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp? 'date' as per api
+
+    # machine: Mapped[str] = mapped_column(String)  # station No. as per api
+    # number: Mapped[int] = mapped_column(Integer)  # stone block No. as per api
+    # comment: Mapped[str] = mapped_column(String)  # other comment as per api
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -40,24 +43,27 @@ class Event(Base):
     async def event_create(
         *,
         db_session: AsyncSession,
-        name: str
+        type_id: int,
+        camera_id: int,
+        time: datetime
     ) -> 'Event':
 
-        event = await db_session.execute(
-            select(Event)
-            .filter(
-                Event.name == name
-            )
+        # event = await db_session.execute(
+        #     select(Event)
+        #     .filter(
+        #         Event.name == name
+        #     )
+        # )
+        # event = event.scalars().first()
+
+        # if event is None:
+        event = Event(
+            type_id=type_id,
+            camera_id=camera_id,
+            time=time
         )
-
-        event = event.scalars().first()
-
-        if event is None:
-            event = Event(
-                name=name
-            )
-        else:
-            event.deleted = False
+        # else:
+        #     event.deleted = False
 
         db_session.add(event)
         await db_session.commit()

@@ -19,10 +19,8 @@ from core.database import SessionLocal
 from core.utils import extract_frame
 from core.utils import get_time_from_video_path
 from core.scenarios import is_in_roi
-from core.scenarios import get_event_end_time
-from core.scenarios import calculate_motion
-from core.scenarios import calculate_center
-from core.scenarios import is_moving
+from core.scenarios import check_for_motion
+from core.scenarios import check_if_object_present
 
 
 class ObjectDetection:
@@ -207,7 +205,7 @@ class ObjectDetection:
         vid_start_time, _ = get_time_from_video_path(video_path)
         all_results = {}
 
-        track = []
+        saw_xywh_history = []
         saw_track_magn = 0
         already_moving = False
 
@@ -242,110 +240,53 @@ class ObjectDetection:
 
                         for item in frame_pred:
                             item['time'] = detection_time
-                            class_ids.append(item['class_id'])
 
                             item_in_roi = is_in_roi(
                                 roi_xyxy=cfg.camera_1_roi,
                                 object_xyxy=item['xyxy']
                             )
                             if item_in_roi:
+                                class_ids.append(item['class_id'])
 
                                 # saw motion logic
                                 if item['class_id'] == 1:  # saw class id
-                                    track.append(item['xywh'])
-
-                                    if len(track) > 1:
-                                        if len(track) < curr_fps * cfg.saw_moving_sec:
-                                            magnitude = calculate_motion(
-                                                prev_bbox=track[-2],
-                                                curr_bbox=track[-1]
-                                            )
-                                            saw_track_magn += magnitude
-                                        else:
-                                            logger.debug(f'Magnitude: {saw_track_magn}')
-                                            in_motion = is_moving(
-                                                magnitude=saw_track_magn,
-                                                threshold=cfg.saw_moving_threshold
-                                            )
-
-                                            item['saw_moving'] = in_motion
-                                            logger.debug(f'Saw moving: {in_motion}')
-
-                                            if in_motion and not already_moving:
-                                                event = await Event.event_create(
-                                                    db_session=session,
-                                                    type_id=3,  # rm hardcoded id
-                                                    camera_id=1,  # default
-                                                    time=detection_time
-                                                )
-                                                logger.info(f'The saw started moving at {detection_time}, event created: {event.__dict__}')
-                                                already_moving = True
-
-                                            elif not in_motion and already_moving:
-                                                event = await Event.event_create(
-                                                    db_session=session,
-                                                    type_id=4,  # rm hardcoded id
-                                                    camera_id=1,  # default
-                                                    time=detection_time
-                                                )
-                                                logger.info(f'The saw stopped moving at {detection_time}, event created: {event.__dict__}')
-                                                already_moving = False
-
-                                            # clear history
-                                            saw_track_magn = 0
-                                            track.clear()
-
-                            # stone logic
-                            logger.debug(f'Class IDs: {class_ids}')
-                            if 0 in class_ids:  # stone class id
-                                stone_history.append(True)
-                            else:
-                                stone_history.append(False)
-                            class_ids.clear()
-                            
-                            logger.debug(f'Stone history: {stone_history}')
-                            if len(stone_history) >= curr_fps * cfg.stone_check_sec:
-                                true_count = stone_history.count(True)
-                                if true_count > len(stone_history) // 2:
-                                    stone_present = True
-                                else:
-                                    stone_present = False
-                                
-                                if stone_present and not stone_already_present:
-                                    event = await Event.event_create(
+                                    saw_track_magn, already_moving = await check_for_motion(
                                         db_session=session,
-                                        type_id=1,  # rm hardcoded id
-                                        camera_id=1,  # default
-                                        time=detection_time
+                                        xywh_history=saw_xywh_history,
+                                        detected_item=item,
+                                        saw_track_magn=saw_track_magn,
+                                        already_moving=already_moving,
+                                        curr_fps=curr_fps,
+                                        detection_time=detection_time
                                     )
-                                    logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
-                                    stone_already_present = True
+                                    # saw_track_magn = magnitude
+                                    # already_moving = is_moving
 
-                                elif not stone_present and stone_already_present:
-                                    event = await Event.event_create(
-                                        db_session=session,
-                                        type_id=2,  # rm hardcoded id
-                                        camera_id=1,  # default
-                                        time=detection_time
-                                    )
-                                    logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
-                                    stone_already_present = False
+                        # stone logic
+                        stone_already_present = await check_if_object_present(
+                            db_session=session,
+                            class_id=0,  # stone class id
+                            detected_class_ids=class_ids,
+                            object_history=stone_history,
+                            object_already_present=stone_already_present,
+                            curr_fps=curr_fps,
+                            detection_time=detection_time
+                        )
+                        # stone_already_present = is_present
 
-                                stone_history.clear()
+                        # update tracker
 
-                            # update tracker
-
-                            # sort
-                            # track_bbs_ids = tracker.update(detections)
-                            # if track_bbs_ids.size != 0:
-                                # track_id = int(track_bbs_ids[0][-1])
-            
-                            # deep_sort
-                            # tracker.update(frame, detections)
-                            # for track in tracker.tracks:
-                            #     track_id = track.track_id
-                            #     item["track_id"] = track_id
-                            #     logger.debug(f'Track ID: {track_id}')
+                        # sort
+                        # track_bbs_ids = tracker.update(detections)
+                        # if track_bbs_ids.size != 0:
+                            # track_id = int(track_bbs_ids[0][-1])
+        
+                        # deep_sort
+                        # tracker.update(frame, detections)
+                        # for track in tracker.tracks:
+                        #     track_id = track.track_id
+                        #     item["track_id"] = track_id
+                        #     logger.debug(f'Track ID: {track_id}')
 
                     logger.debug(f'results: {frame_pred}')
                     all_results[frame_idx] = frame_pred

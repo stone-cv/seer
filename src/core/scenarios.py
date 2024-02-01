@@ -1,9 +1,13 @@
 import numpy as np
 
-from datetime import datetime
 from typing import List
+from datetime import datetime
 
+from sqlalchemy.ext.asyncio import AsyncSession
+
+import core.config as cfg
 from core.logger import logger
+from core.models import Event
 
 
 def is_in_roi(roi_xyxy: List[tuple], object_xyxy: list) -> bool:
@@ -96,33 +100,108 @@ def is_moving(magnitude, threshold):  # necessary?
     return in_motion
 
 
-# def check_for_motion(track_history, item, track_magn, already_moving, curr_fps, detection_time):
-#     track_history.append(item['xywh'])
+async def check_for_motion(
+        db_session: AsyncSession,
+        xywh_history: list,
+        detected_item: dict,
+        saw_track_magn: float,  # ?
+        already_moving: bool,
+        curr_fps: int,
+        detection_time: datetime
+) -> None:  # ?
 
-#     if len(track) > 1:
-#         if len(track) < curr_fps*10:  # fps from frame_generator x 10 seconds
-#             magnitude = calculate_motion(
-#                 prev_bbox=track[-2],
-#                 curr_bbox=track[-1]
-#             )
-#             track_magn += magnitude
-#         else:
-#             logger.debug(f'Magnitude: {track_magn}')
-#             in_motion = is_moving(magnitude=track_magn, threshold=70)
+    xywh_history.append(detected_item['xywh'])
 
-#             item['saw_moving'] = in_motion
-#             logger.debug(f'Saw moving: {in_motion}')
+    if len(xywh_history) > 1:
+        if len(xywh_history) < curr_fps * cfg.saw_moving_sec:
+            magnitude = calculate_motion(
+                prev_bbox=xywh_history[-2],
+                curr_bbox=xywh_history[-1]
+            )
+            saw_track_magn += magnitude
+        else:
+            logger.debug(f'Magnitude: {saw_track_magn}')
+            in_motion = is_moving(
+                magnitude=saw_track_magn,
+                threshold=cfg.saw_moving_threshold
+            )
 
-#             if in_motion and not already_moving:
-#                 already_moving = True
-#                 # create an event
-#                 logger.info(f'The saw started moving at {detection_time}')
+            detected_item['saw_moving'] = in_motion
+            logger.debug(f'Saw moving: {in_motion}')
 
-#             elif not in_motion and already_moving:
-#                 already_moving = False
-#                 # create an event
-#                 logger.info(f'The saw stopped moving at {detection_time}')
+            if in_motion and not already_moving:
+                event = await Event.event_create(
+                    db_session=db_session,
+                    type_id=3,  # rm hardcoded id
+                    camera_id=1,  # default
+                    time=detection_time
+                )
+                logger.info(f'The saw started moving at {detection_time}, event created: {event.__dict__}')
+                already_moving = True
 
-#             # clear history
-#             track_magn = 0
-#             track.clear()
+            elif not in_motion and already_moving:
+                event = await Event.event_create(
+                    db_session=db_session,
+                    type_id=4,  # rm hardcoded id
+                    camera_id=1,  # default
+                    time=detection_time
+                )
+                logger.info(f'The saw stopped moving at {detection_time}, event created: {event.__dict__}')
+                already_moving = False
+
+            # clear history
+            saw_track_magn = 0
+            xywh_history.clear()
+
+    return saw_track_magn, already_moving
+
+
+async def check_if_object_present(
+        db_session: AsyncSession,
+        class_id: int,
+        detected_class_ids: List[int],
+        object_history: List[bool],
+        object_already_present: bool,
+        curr_fps: int,
+        detection_time: datetime
+
+) -> None:  # ?
+
+    logger.debug(f'Class IDs: {detected_class_ids}')
+    if class_id in detected_class_ids:
+        object_history.append(True)
+    else:
+        object_history.append(False)
+    detected_class_ids.clear()
+    
+    logger.debug(f'Stone history: {object_history}')
+    if len(object_history) >= curr_fps * cfg.stone_check_sec:
+        true_count = object_history.count(True)
+        if true_count > len(object_history) // 2:
+            stone_present = True
+        else:
+            stone_present = False
+        
+        if stone_present and not object_already_present:
+            event = await Event.event_create(
+                db_session=db_session,
+                type_id=1,  # rm hardcoded id
+                camera_id=1,  # default
+                time=detection_time
+            )
+            logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
+            object_already_present = True
+
+        elif not stone_present and object_already_present:
+            event = await Event.event_create(
+                db_session=db_session,
+                type_id=2,  # rm hardcoded id
+                camera_id=1,  # default
+                time=detection_time
+            )
+            logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
+            object_already_present = False
+
+        object_history.clear()
+
+    return object_already_present

@@ -1,53 +1,38 @@
 import asyncio
-import time
-import uvicorn
-from ultralytics import YOLO
-from fastapi import FastAPI
-from fastapi import APIRouter
 
 import core.config as cfg
-from core.database import Base, db_engine
 from core.logger import logger
+from core.database import Base
+from core.database import db_engine
 from detector.detector import ObjectDetection
-from core.app import app
+from core.app import process_video
 from core.models import *
 
-
-# app = FastAPI(title="Seer")
-# api_router = APIRouter()
 
 async def main():
     logger.info('App initiated')
 
-    t = time.localtime()
-    current_time = time.strftime("%H:%M:%S", t)
+    # async with db_engine.begin() as conn:
+    #     await conn.run_sync(Base.metadata.drop_all)
+    #     await conn.run_sync(Base.metadata.create_all)
+    #     logger.info('DB metadata created')
 
-    async with db_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
-        await conn.run_sync(Base.metadata.create_all)
-        logger.info('DB metadata created')
-
-    detector = ObjectDetection(capture_index=0)
+    detector = ObjectDetection(capture_index=0)  # here? source?
 
     #train
-    # logger.debug(f'Training started at {current_time}')
+    # logger.info(f'Training started')
     # detector.train_custom(data='datasets/data.yaml')
-    # logger.debug(f'Training finished at {current_time}')
+    # logger.info(f'Training complete')
 
     # for video in config.videos:
     logger.info('Detection started')
-    await detector(video_path=cfg.video_path)
+    await process_video(
+        detector=detector,
+        video_path=cfg.video_path,
+        camera_id=1  # deafult for now
+    )
 
 
 if __name__ == '__main__':
     asyncio.run(main())
     # uvicorn.run("main:app", port=8000, reload=True)
-
-    # model = YOLO("yolov8n.pt")
-    # model.predict(
-    #     source="static/stone_4sec.mp4",
-    #     show=True,
-    #     save=True,
-    #     save_txt=True,
-    #     device="mps",
-    # )

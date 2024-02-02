@@ -10,7 +10,21 @@ from core.logger import logger
 from core.models import Event
 
 
-def is_in_roi(roi_xyxy: List[tuple], object_xyxy: list) -> bool:
+async def is_in_roi(
+        roi_xyxy: List[tuple],
+        object_xyxy: List[List[int]]
+) -> bool:
+    """
+    Функция, позволяющая определить по координатам, находится ли
+    объект в указанной зоне (частично или полностью).
+
+    Args:
+        roi_xyxy (List[tuple]):
+        object_xyxy: List[List[int]]:
+    
+    Returns:
+        bool: 
+    """
     roi_xmin = int(roi_xyxy[0][0])
     roi_ymin = int(roi_xyxy[0][1])
     roi_xmax = int(roi_xyxy[1][0])
@@ -30,7 +44,11 @@ def is_in_roi(roi_xyxy: List[tuple], object_xyxy: list) -> bool:
     return is_in_roi
 
 
-def find_class_objects_in_roi(roi_coord: List[tuple], class_id: int, result_dict: dict):
+async def find_class_objects_in_roi(
+        roi_coord: List[tuple],
+        class_id: int,
+        result_dict: dict
+) -> List[dict]:
     roi_xmin = int(roi_coord[0][0])
     roi_ymin = int(roi_coord[0][1])
     roi_xmax = int(roi_coord[1][0])
@@ -59,7 +77,7 @@ def find_class_objects_in_roi(roi_coord: List[tuple], class_id: int, result_dict
     return objects_in_roi
 
 
-def get_event_end_time(events: dict, track_id: int):
+async def get_event_end_time(events: dict, track_id: int):
 
     # Initialize with a value lower than the minimum time
     last_detection_time = datetime.strptime("01.01.1970 00:00:00", "%d.%m.%Y %H:%M:%S")

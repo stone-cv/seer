@@ -24,7 +24,7 @@ DEBUG = config['Application']['DEBUG']
 log_dir = config['Application']['log_dir']
 results_dir = config['Application']['results_dir']
 video_path = config['Application']['video_path']
-camera_1_roi = config['Application']['camera_1_roi']
+fps = config['Application']['fps']
 
 # saw logic
 saw_moving_sec = config['Saw_logic']['saw_moving_sec']

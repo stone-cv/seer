@@ -1,4 +1,4 @@
-import yaml
+import ast
 import datetime
 from typing import Optional
 
@@ -13,6 +13,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from core.logger import logger
 from core.database import Base
 # from core.security import fernet_encrypt
 
@@ -45,25 +46,20 @@ class Event(Base):
         db_session: AsyncSession,
         type_id: int,
         camera_id: int,
-        time: datetime
+        time: datetime,
+        machine: Optional[str] = 'PW1TK 3000',
+        stone_number: Optional[int] = 1,
+        comment: Optional[str] = 'test'
     ) -> 'Event':
 
-        # event = await db_session.execute(
-        #     select(Event)
-        #     .filter(
-        #         Event.name == name
-        #     )
-        # )
-        # event = event.scalars().first()
-
-        # if event is None:
         event = Event(
             type_id=type_id,
             camera_id=camera_id,
-            time=time
+            time=time,
+            machine=machine,
+            stone_number=stone_number,
+            comment=comment
         )
-        # else:
-        #     event.deleted = False
 
         db_session.add(event)
         await db_session.commit()
@@ -116,6 +112,64 @@ class Camera(Base):
     # event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    @staticmethod
+    async def camera_create(
+        *,
+        db_session: AsyncSession,
+        name: str,
+        url: str,
+        roi_coord: str
+    ) -> 'Camera':
+
+        camera = Camera(
+            name=name,
+            url=url,
+            roi_coord=roi_coord
+        )
+
+        db_session.add(camera)
+        await db_session.commit()
+
+        return camera
+
+    @staticmethod
+    async def camera_delete(
+        *,
+        db_session: AsyncSession,
+        camera_id: int
+    ) -> 'Camera':
+
+        camera = await db_session.execute(
+            select(Camera).filter(
+                Camera.id == camera_id
+            )
+        )
+
+        camera = camera.scalars().first()
+        camera.deleted = True
+        await db_session.commit()
+
+        return camera
+    
+    @staticmethod
+    async def get_roi_by_camera_id(
+        *,
+        db_session: AsyncSession,
+        camera_id: int
+    ) -> 'Camera':
+
+        camera = await db_session.execute(
+            select(Camera).filter(
+                Camera.id == camera_id
+            )
+        )
+        camera = camera.scalars().first()
+
+        camera_roi = ast.literal_eval(camera.roi)
+        logger.debug(f'Camera {camera_id} ROI retrieved: {camera_roi} ({type(camera_roi)})')
+
+        return camera_roi
 
 
 # class RegionOfInterest(Base):  # for multiple regions per camera

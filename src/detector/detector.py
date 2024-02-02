@@ -4,23 +4,13 @@ import numpy as np
 import supervision as sv
 
 from time import time
-from datetime import timedelta
-from collections import defaultdict
+
 from ultralytics import YOLO
 from clearml import Task
 from sklearn.model_selection import train_test_split
 
 import core.config as cfg
 from core.logger import logger
-# from tracker.tracker import Sort
-from tracker.tracker_dpsort import Tracker
-from core.models import Event
-from core.database import SessionLocal
-from core.utils import extract_frame
-from core.utils import get_time_from_video_path
-from core.scenarios import is_in_roi
-from core.scenarios import check_for_motion
-from core.scenarios import check_if_object_present
 
 
 class ObjectDetection:
@@ -86,6 +76,21 @@ class ObjectDetection:
         device="mps",
         )
         
+        return results
+    
+
+    def track_custom(self, source):
+
+        results = self.model.track(
+            source=source,
+            persist=True,
+            conf=0.5,
+            iou=0.5,
+            device='mps',
+            # tracker="bytetrack.yaml",
+            show=True
+        )
+
         return results
     
 
@@ -194,139 +199,35 @@ class ObjectDetection:
         return frame
     
     
-    async def __call__(self, video_path):
+    def __call__(self):
 
-        frame_generator = extract_frame(
-            video_path=video_path,
-            fps=5
-        )
-        # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-        # tracker = Tracker()
-        vid_start_time, _ = get_time_from_video_path(video_path)
-        all_results = {}
-
-        saw_xywh_history = []
-        saw_track_magn = 0
-        already_moving = False
-
-        class_ids = []
-        stone_history = []
-        stone_already_present = False
-        
-        try:
-            for frame, frame_idx, video_fps, curr_fps in frame_generator:
-                detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
-                logger.debug(f'Detection time: {detection_time}')
-
-                logger.debug(f'Frame ID: {frame_idx}')
-                results = self.model.track(
-                    source=frame,
-                    persist=True,
-                    conf=0.5,
-                    iou=0.5,
-                    device='mps',
-                    # tracker="bytetrack.yaml",
-                    show=True
-                )
-
-                # results = self.predict_custom(
-                #     frame=frame
-                # )
-
-                for result in results:
-                    frame_pred, detections = self.parse_detections(result)
-
-                    async with SessionLocal() as session:
-
-                        for item in frame_pred:
-                            item['time'] = detection_time
-
-                            item_in_roi = is_in_roi(
-                                roi_xyxy=cfg.camera_1_roi,
-                                object_xyxy=item['xyxy']
-                            )
-                            if item_in_roi:
-                                class_ids.append(item['class_id'])
-
-                                # saw motion logic
-                                if item['class_id'] == 1:  # saw class id
-                                    saw_track_magn, already_moving = await check_for_motion(
-                                        db_session=session,
-                                        xywh_history=saw_xywh_history,
-                                        detected_item=item,
-                                        saw_track_magn=saw_track_magn,
-                                        already_moving=already_moving,
-                                        curr_fps=curr_fps,
-                                        detection_time=detection_time
-                                    )
-                                    # saw_track_magn = magnitude
-                                    # already_moving = is_moving
-
-                        # stone logic
-                        stone_already_present = await check_if_object_present(
-                            db_session=session,
-                            class_id=0,  # stone class id
-                            detected_class_ids=class_ids,
-                            object_history=stone_history,
-                            object_already_present=stone_already_present,
-                            curr_fps=curr_fps,
-                            detection_time=detection_time
-                        )
-                        # stone_already_present = is_present
-
-                        # update tracker
-
-                        # sort
-                        # track_bbs_ids = tracker.update(detections)
-                        # if track_bbs_ids.size != 0:
-                            # track_id = int(track_bbs_ids[0][-1])
-        
-                        # deep_sort
-                        # tracker.update(frame, detections)
-                        # for track in tracker.tracks:
-                        #     track_id = track.track_id
-                        #     item["track_id"] = track_id
-                        #     logger.debug(f'Track ID: {track_id}')
-
-                    logger.debug(f'results: {frame_pred}')
-                    all_results[frame_idx] = frame_pred
-
-        except StopIteration:
-            pass
-
-        self.save_detections_to_csv(
-            results_dict=all_results,
-            video_path=video_path,
-            video_fps=video_fps
-        )      
-
-        # cap = cv2.VideoCapture(self.capture_index)
-        # assert cap.isOpened()
-        # cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
-        # cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+        cap = cv2.VideoCapture(self.capture_index)
+        assert cap.isOpened()
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
       
-        # while True:
-            # ret, frame = cap.read()
-            # assert ret
+        while True:
+            ret, frame = cap.read()
+            assert ret
         
+            start_time = time()
+            results = self.predict(frame)
+            frame = self.plot_bboxes(results, frame)
             
-            # results = self.predict(frame)
-            # frame = self.plot_bboxes(results, frame)
-            
-            # end_time = time()
-            # fps = 1/np.round(end_time - start_time, 2)
+            end_time = time()
+            fps = 1/np.round(end_time - start_time, 2)
              
-            # cv2.putText(frame, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,255,0), 2)
+            cv2.putText(frame, f'FPS: {int(fps)}', (20,70), cv2.FONT_HERSHEY_SIMPLEX, 1.5, (0,255,0), 2)
             
-            # cv2.imshow('YOLOv8 Detection', frame)
+            cv2.imshow('YOLOv8 Detection', frame)
  
-            # if cv2.waitKey(5) & 0xFF == 27:
-            #     break
+            if cv2.waitKey(5) & 0xFF == 27:
+                break
         
-        # cap.release()
-        # cv2.destroyAllWindows()
+        cap.release()
+        cv2.destroyAllWindows()
         
         
 if __name__ == '__main__':
-    detector = ObjectDetection(capture_index=0)  # add source
+    detector = ObjectDetection(capture_index=0)
     detector()

@@ -47,7 +47,7 @@ def get_time_from_video_path(video_path: str):
 
 
 
-def get_camera_roi():  # doesn't work
+def create_camera_roi():  # doesn't work
     # Initialize variables
     drawing = False
     roi_points = []

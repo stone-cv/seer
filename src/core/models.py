@@ -33,9 +33,9 @@ class Event(Base):
 
     time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp? 'date' as per api
 
-    # machine: Mapped[str] = mapped_column(String)  # station No. as per api
-    # number: Mapped[int] = mapped_column(Integer)  # stone block No. as per api
-    # comment: Mapped[str] = mapped_column(String)  # other comment as per api
+    machine: Mapped[str] = mapped_column(String, nullable=True)  # station No. as per api
+    stone_number: Mapped[int] = mapped_column(Integer, nullable=True)  # stone block No. as per api
+    comment: Mapped[str] = mapped_column(String, nullable=True)  # other comment as per api
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -74,12 +74,12 @@ class Event(Base):
     async def event_delete(
         *,
         db_session: AsyncSession,
-        id_group: int
+        event_id: int
     ) -> 'Event':
 
         event = await db_session.execute(
             select(Event).filter(
-                Event.id == id_group
+                Event.id == event_id
             )
         )
 
@@ -110,13 +110,15 @@ class Camera(Base):
 
     event: Mapped['Event'] = relationship(back_populates="camera")
 
+    roi: Mapped[str] = mapped_column(String(255))
+
     # roi_id: Mapped[int] = mapped_column(ForeignKey("roi_zones.id"))
     # event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
-# class RegionOfInterest(Base):
+# class RegionOfInterest(Base):  # for multiple regions per camera
 #     __tablename__ = "roi_zones"
 
 #     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)

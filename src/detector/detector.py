@@ -118,7 +118,7 @@ class ObjectDetection:
                     detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)  # for tracker
 
                 else:
-                    logger.debug('No detections')
+                    logger.info('No detections')
                     detections = np.empty((0, 5))  # for tracker
 
         except Exception as e:

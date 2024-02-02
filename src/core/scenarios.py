@@ -23,7 +23,7 @@ def is_in_roi(roi_xyxy: List[tuple], object_xyxy: list) -> bool:
     # Check if the bounding box intersects or lies within the ROI
     if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
         is_in_roi = True
-        logger.debug(f"The object detected is in the ROI")
+        # logger.debug(f"The object detected is in the ROI")
     else:
         logger.debug(f"The object is detected not in the ROI")
 

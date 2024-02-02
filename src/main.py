@@ -22,10 +22,10 @@ async def main():
     t = time.localtime()
     current_time = time.strftime("%H:%M:%S", t)
 
-    # async with db_engine.begin() as conn:
-        # await conn.run_sync(Base.metadata.drop_all)
-        # await conn.run_sync(Base.metadata.create_all)
-        # logger.info('DB metadata created')
+    async with db_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+        await conn.run_sync(Base.metadata.create_all)
+        logger.info('DB metadata created')
 
     detector = ObjectDetection(capture_index=0)
 

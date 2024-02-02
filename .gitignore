@@ -163,8 +163,10 @@ venv/
 runs/
 static/
 results/
-# deep_sort/
+deep_sort/
 datasets/
+*.ini
+
 .DS_Store
 *.pt
 *.onnx

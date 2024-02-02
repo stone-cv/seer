@@ -1,11 +1,25 @@
 import cv2
 from typing import Any
+from typing import List
 from datetime import datetime
 
 from core.logger import logger
 
 
-def extract_frame(video_path: str, fps: int = 5) -> Any:
+def extract_frame(
+        video_path: str,
+        fps: int = 5
+) -> Any:
+    """
+    Генератор, извлекающий из видео заданное количество кадров в секунду.
+
+    Args:
+        video_path (str): путь к видеофайлу
+        fps (int): желаемое количество кадров в секунду
+    
+    Returns:
+        Возвращает кадры с учетом заданного значения FPS.
+    """
     video = cv2.VideoCapture(video_path)
 
     # video_start_time = video.get(cv2.CAP_PROP_CREATION_TIME)
@@ -32,10 +46,23 @@ def extract_frame(video_path: str, fps: int = 5) -> Any:
     cv2.destroyAllWindows()
 
     logger.info(f'Extracted {frame_count} frames from {video_path}')
-    return
+    return  # ?
 
 
-def get_time_from_video_path(video_path: str):
+def get_time_from_video_path(
+        video_path: str
+) -> (datetime, datetime):
+    """
+    Функция, позволяющая извлечь из названия видеофайла время начала и
+    окончания видеофрагмента (при условии соблюдения конвенций для наименования файлов).
+
+    Args:
+        video_path (str): название видеофайла
+    
+    Returns:
+        start_time (datetime): время начала видео
+        end_time (datetime): время окончания видео
+    """
     start_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[1]))
     end_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[2].split('.')[0]))
 
@@ -47,7 +74,16 @@ def get_time_from_video_path(video_path: str):
 
 
 
-def create_camera_roi():  # doesn't work
+def create_camera_roi(frame) -> List(tuple):  # doesn't work
+    """
+    Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
+
+    Args:
+        frame: кадр-образец
+    
+    Returns:
+        roi_points (List(tuple)): координаты области интереса
+    """
     # Initialize variables
     drawing = False
     roi_points = []
@@ -85,10 +121,10 @@ def create_camera_roi():  # doesn't work
             # Confirm the ROI and proceed with further processing
             break
 
-    print(roi_points)
+    logger.info(roi_points)
     cv2.destroyAllWindows()
     return roi_points
 
 
 if __name__ == '__main__':
-    get_camera_roi()
+    create_camera_roi()

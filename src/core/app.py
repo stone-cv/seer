@@ -83,13 +83,13 @@ async def process_video(
                 # results = detector.predict_custom(source=frame)
 
                 for result in results:
-                    frame_pred, detections = detector.parse_detections(result)
+                    frame_pred, detections = detector.parse_detections(result)  # detections for an outside tracker
 
                     for item in frame_pred:
                         item['time'] = detection_time
 
                         # ROI check
-                        item_in_roi = is_in_roi(
+                        item_in_roi = await is_in_roi(
                             roi_xyxy=camera_roi,
                             object_xyxy=item['xyxy']
                         )

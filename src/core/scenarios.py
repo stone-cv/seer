@@ -15,15 +15,16 @@ async def is_in_roi(
         object_xyxy: List[List[int]]
 ) -> bool:
     """
-    Функция, позволяющая определить по координатам, находится ли
-    объект в указанной зоне (частично или полностью).
+    Функция, позволяющая по координатам определить, находится ли
+    обнраруженный объект в области интереса (частично или полностью).
 
     Args:
-        roi_xyxy (List[tuple]):
-        object_xyxy: List[List[int]]:
+        roi_xyxy (List[tuple]): координаты области интереса в формате XYXY
+        object_xyxy: List[List[int]]: координаты объекта на кадре в формате XYXY
     
     Returns:
-        bool: 
+        bool: возвращает True, если объект частично или полностью находится в области интереса, 
+            и False, если коррдинаты никак не пересекаются
     """
     roi_xmin = int(roi_xyxy[0][0])
     roi_ymin = int(roi_xyxy[0][1])
@@ -44,55 +45,21 @@ async def is_in_roi(
     return is_in_roi
 
 
-async def find_class_objects_in_roi(
-        roi_coord: List[tuple],
-        class_id: int,
-        result_dict: dict
-) -> List[dict]:
-    roi_xmin = int(roi_coord[0][0])
-    roi_ymin = int(roi_coord[0][1])
-    roi_xmax = int(roi_coord[1][0])
-    roi_ymax = int(roi_coord[1][1])
+def calculate_motion(
+        prev_bbox: List[float],
+        curr_bbox: List[float]
+) -> float:
+    """
+    Функция, позволяющая рассчитать величину смещения (евклидово расстояние)
+    b-box'а относительно его местоположения на предыдущем кадре.
 
-    # is_in_roi = False
-    prior_track_ids = []
-    objects_in_roi = []
-
-    for _, values in result_dict.items():
-        # if values:
-        for item in values:
-            if item['class_id'] == class_id and item['track_id'] not in prior_track_ids:
-
-                xyxy = item['xyxy']
-                xmin, ymin, xmax, ymax = xyxy
-
-                # Check if the bounding box intersects or lies within the ROI
-                if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
-                    logger.debug(f"Object with Class ID {class_id} is inside the ROI\n{item}")
-                    prior_track_ids.append(item['track_id'])
-                    objects_in_roi.append(item)
-                else:
-                    logger.debug(f"Object with Class ID {class_id} is outside the ROI\n{item}")
-
-    return objects_in_roi
-
-
-async def get_event_end_time(events: dict, track_id: int):
-
-    # Initialize with a value lower than the minimum time
-    last_detection_time = datetime.strptime("01.01.1970 00:00:00", "%d.%m.%Y %H:%M:%S")
-    for _, values in events.items():
-        for item in values:
-            if item["track_id"] == track_id:
-                if item["time"] > last_detection_time:
-                    last_detection_time = item["time"]
-
-    return last_detection_time
-
-
-# Calculate Motion
-def calculate_motion(prev_bbox, curr_bbox):
-
+    Args:
+        prev_bbox (List[float]): координаты b-box'а на текущем кадре в формате XYWH
+        curr_bbox (List[float]): координаты b-box'а на предыдущем кадре в формате XYWH
+    
+    Returns:
+        float: величина смещения b-box'а
+    """
     prev_center = calculate_center(prev_bbox)
     curr_center = calculate_center(curr_bbox)
 
@@ -101,18 +68,40 @@ def calculate_motion(prev_bbox, curr_bbox):
 
     return magnitude
 
-def calculate_center(bbox):
 
+def calculate_center(bbox: List[float]) -> np.ndarray:
+    """
+    Функция, позволяющая вычислить координаты центра b-box'а.
+
+    Args:
+        bbox (List[float]): координаты b-box'а в формате XYWH
+    
+    Returns:
+        numpy.ndarray: координаты центра b-box'а
+    """
     x, y, w, h = bbox
     center_x = x + (w / 2)
     center_y = y + (h / 2)
-
     logger.debug(f'BBox center: {center_x}, {center_y}')
+
     return np.array([center_x, center_y])
 
-# Threshold for Movement
-def is_moving(magnitude, threshold):  # necessary?
 
+def is_moving(
+        magnitude: float,
+        threshold: int
+) -> bool:
+    """
+    Функция, позволяющая определить, движется ли объект
+    на основании величины его смещения.
+
+    Args:
+        magnitude (float): величина смещения b-box'а
+        threshold (int): предел, обозначающий величину, начиная с которой объект считается движущимся
+    
+    Returns:
+        bool: возвращает True, если объект считается движущимся
+    """
     in_motion = magnitude > threshold
 
     return in_motion
@@ -120,14 +109,35 @@ def is_moving(magnitude, threshold):  # necessary?
 
 async def check_for_motion(
         db_session: AsyncSession,
-        xywh_history: list,
+        xywh_history: List[List[float]],
         detected_item: dict,
-        saw_track_magn: float,  # ?
+        saw_track_magn: float,
         already_moving: bool,
         curr_fps: int,
         detection_time: datetime
-) -> None:  # ?
+) -> (float, bool):
+    """
+    Функция, позволяющая определить, движется ли объект:
+        - фиксируется величина смещения b-box'а за указанный
+        в конфиг. файле отрезок времени;
+        - если делается вывод о том, что объект находится в движении,
+        однако до этого он был статичен, создается событие о начале движения объекта;
+        - если делается вывод о том, что объект статичен, однако до этого он
+        находился в движении, создается событие об остановке объекта.
 
+    Args:
+        db_session (AsyncSession): объект асинхронной сессии БД
+        xywh_history (List[List[float]]): список, содержащий координаты b-box'а в формате XYWH на последовательных кадрах
+        detected_item (dict): словарь, содержащий информацию об обнаруженном объекте, куда будет записано значение (bool), соответствующее движению объекта
+        saw_track_magn (float): величина смещения b-box'а
+        already_moving (bool): флаг, обозначающий, находился ли в движении объект до текущей проверки
+        curr_fps (int): количество кадров, анализируемых за секунду видео
+        detection_time (datetime): время обнаружения объекта
+    
+    Returns:
+        saw_track_magn (float): обновленная величина смещения b-box'а
+        already_moving (bool): обновленное значение
+    """
     xywh_history.append(detected_item['xywh'])
 
     if len(xywh_history) > 1:
@@ -182,9 +192,28 @@ async def check_if_object_present(
         object_already_present: bool,
         curr_fps: int,
         detection_time: datetime
+) -> bool:
+    """
+    Функция, позволяющая определить, присутствиует ли на видео объект:
+        - фиксируется наличие или отсутствие детекции объекта заданного класса 
+        на протяжении указанного в конфиг. файле отрезка времени;
+        - если делается вывод о том, что объект находится на видео,
+        однако до этого его не было, создается событие о появлении нового объекта;
+        - если делается вывод о том, что объекта на видео нет, однако до этого он
+        присутствовал на видео, создается событие об отсутствии объекта.
 
-) -> None:  # ?
-
+    Args:
+        db_session (AsyncSession): объект асинхронной сессии БД
+        class_id (int): идентификатор класса детекции, к которому принадлежит объект
+        detected_class_ids (List[int]): список идентификаторов классов детекции, обнаруженных на кадре
+        object_history (List[bool]): список значений, обозначающих наличие или отсутствие обьъекта на кадре
+        object_already_present (bool): флаг, обозначающий, находился ли объект на видео до текущей проверки
+        curr_fps (int): количество кадров, анализируемых за секунду видео
+        detection_time (datetime): время обнаружения объекта
+    
+    Returns:
+        object_already_present (bool): обновленное значение
+    """
     logger.debug(f'Class IDs: {detected_class_ids}')
     if class_id in detected_class_ids:
         object_history.append(True)
@@ -223,3 +252,53 @@ async def check_if_object_present(
         object_history.clear()
 
     return object_already_present
+
+
+# region currently_not_used
+
+async def find_class_objects_in_roi(
+        roi_coord: List[tuple],
+        class_id: int,
+        result_dict: dict
+) -> List[dict]:
+    roi_xmin = int(roi_coord[0][0])
+    roi_ymin = int(roi_coord[0][1])
+    roi_xmax = int(roi_coord[1][0])
+    roi_ymax = int(roi_coord[1][1])
+
+    # is_in_roi = False
+    prior_track_ids = []
+    objects_in_roi = []
+
+    for _, values in result_dict.items():
+        # if values:
+        for item in values:
+            if item['class_id'] == class_id and item['track_id'] not in prior_track_ids:
+
+                xyxy = item['xyxy']
+                xmin, ymin, xmax, ymax = xyxy
+
+                # Check if the bounding box intersects or lies within the ROI
+                if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
+                    logger.debug(f"Object with Class ID {class_id} is inside the ROI\n{item}")
+                    prior_track_ids.append(item['track_id'])
+                    objects_in_roi.append(item)
+                else:
+                    logger.debug(f"Object with Class ID {class_id} is outside the ROI\n{item}")
+
+    return objects_in_roi
+
+
+async def get_event_end_time(events: dict, track_id: int):
+
+    # Initialize with a value lower than the minimum time
+    last_detection_time = datetime.strptime("01.01.1970 00:00:00", "%d.%m.%Y %H:%M:%S")
+    for _, values in events.items():
+        for item in values:
+            if item["track_id"] == track_id:
+                if item["time"] > last_detection_time:
+                    last_detection_time = item["time"]
+
+    return last_detection_time
+
+# endregion

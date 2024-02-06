@@ -74,7 +74,7 @@ def get_time_from_video_path(
 
 
 
-def create_camera_roi(frame) -> List(tuple):  # doesn't work
+def create_camera_roi(frame) -> list():  # doesn't work
     """
     Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
 

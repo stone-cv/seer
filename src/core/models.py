@@ -1,3 +1,4 @@
+import re
 import ast
 import datetime
 from typing import Optional
@@ -13,6 +14,7 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+import core.config as cfg
 from core.logger import logger
 from core.database import Base
 # from core.security import fernet_encrypt
@@ -151,6 +153,34 @@ class Camera(Base):
         await db_session.commit()
 
         return camera
+    
+    @staticmethod
+    async def get_url_by_camera_id(
+        *,
+        db_session: AsyncSession,
+        camera_id: int
+    ) -> 'Camera':
+
+        camera = await db_session.execute(
+            select(Camera).filter(
+                Camera.id == camera_id
+            )
+        )
+        camera = camera.scalars().first()
+        camera_url = camera.url
+        logger.debug(f'Camera {camera_id} url retrieved: {camera_url}')
+
+        pattern = r'rtsp://([^:]+):([^@]+)@'
+        match = re.search(pattern, camera_url)
+
+        if match:
+            login = match.group(1)
+            password = match.group(2)
+            camera_url = camera_url.replace(f'{login}:{password}', f'{cfg.cam_login}:{cfg.cam_password}')
+        else:
+            logger.warn(f'Invalid url for camera {camera_id}: {camera_url}')
+
+        return camera_url
     
     @staticmethod
     async def get_roi_by_camera_id(

@@ -26,6 +26,10 @@ results_dir = config['Application']['results_dir']
 video_path = config['Application']['video_path']
 fps = config['Application']['fps']
 
+# camera auth
+cam_login = config['Camera_auth']['login']
+cam_password = config['Camera_auth']['password']
+
 # saw logic
 saw_moving_sec = config['Saw_logic']['saw_moving_sec']
 saw_moving_threshold = config['Saw_logic']['saw_moving_threshold']

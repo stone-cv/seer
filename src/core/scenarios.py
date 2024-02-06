@@ -51,14 +51,14 @@ def calculate_motion(
 ) -> float:
     """
     Функция, позволяющая рассчитать величину смещения (евклидово расстояние)
-    b-box'а относительно его местоположения на предыдущем кадре.
+    bbox'а относительно его местоположения на предыдущем кадре.
 
     Args:
-        prev_bbox (List[float]): координаты b-box'а на текущем кадре в формате XYWH
-        curr_bbox (List[float]): координаты b-box'а на предыдущем кадре в формате XYWH
+        prev_bbox (List[float]): координаты bbox'а на текущем кадре в формате XYWH
+        curr_bbox (List[float]): координаты bbox'а на предыдущем кадре в формате XYWH
     
     Returns:
-        float: величина смещения b-box'а
+        float: величина смещения bbox'а
     """
     prev_center = calculate_center(prev_bbox)
     curr_center = calculate_center(curr_bbox)
@@ -71,13 +71,13 @@ def calculate_motion(
 
 def calculate_center(bbox: List[float]) -> np.ndarray:
     """
-    Функция, позволяющая вычислить координаты центра b-box'а.
+    Функция, позволяющая вычислить координаты центра bbox'а.
 
     Args:
-        bbox (List[float]): координаты b-box'а в формате XYWH
+        bbox (List[float]): координаты bbox'а в формате XYWH
     
     Returns:
-        numpy.ndarray: координаты центра b-box'а
+        numpy.ndarray: координаты центра bbox'а
     """
     x, y, w, h = bbox
     center_x = x + (w / 2)
@@ -96,7 +96,7 @@ def is_moving(
     на основании величины его смещения.
 
     Args:
-        magnitude (float): величина смещения b-box'а
+        magnitude (float): величина смещения bbox'а
         threshold (int): предел, обозначающий величину, начиная с которой объект считается движущимся
     
     Returns:
@@ -118,7 +118,7 @@ async def check_for_motion(
 ) -> (float, bool):
     """
     Функция, позволяющая определить, движется ли объект:
-        - фиксируется величина смещения b-box'а за указанный
+        - фиксируется величина смещения bbox'а за указанный
         в конфиг. файле отрезок времени;
         - если делается вывод о том, что объект находится в движении,
         однако до этого он был статичен, создается событие о начале движения объекта;
@@ -127,15 +127,15 @@ async def check_for_motion(
 
     Args:
         db_session (AsyncSession): объект асинхронной сессии БД
-        xywh_history (List[List[float]]): список, содержащий координаты b-box'а в формате XYWH на последовательных кадрах
+        xywh_history (List[List[float]]): список, содержащий координаты bbox'а в формате XYWH на последовательных кадрах
         detected_item (dict): словарь, содержащий информацию об обнаруженном объекте, куда будет записано значение (bool), соответствующее движению объекта
-        saw_track_magn (float): величина смещения b-box'а
+        saw_track_magn (float): величина смещения bbox'а
         already_moving (bool): флаг, обозначающий, находился ли в движении объект до текущей проверки
         curr_fps (int): количество кадров, анализируемых за секунду видео
         detection_time (datetime): время обнаружения объекта
     
     Returns:
-        saw_track_magn (float): обновленная величина смещения b-box'а
+        saw_track_magn (float): обновленная величина смещения bbox'а
         already_moving (bool): обновленное значение
     """
     xywh_history.append(detected_item['xywh'])

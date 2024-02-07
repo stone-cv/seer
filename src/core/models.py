@@ -159,7 +159,7 @@ class Camera(Base):
         *,
         db_session: AsyncSession,
         camera_id: int
-    ) -> 'Camera':
+    ) -> str:
 
         camera = await db_session.execute(
             select(Camera).filter(
@@ -173,12 +173,16 @@ class Camera(Base):
         pattern = r'rtsp://([^:]+):([^@]+)@'
         match = re.search(pattern, camera_url)
 
-        if match:
-            login = match.group(1)
-            password = match.group(2)
-            camera_url = camera_url.replace(f'{login}:{password}', f'{cfg.cam_login}:{cfg.cam_password}')
-        else:
-            logger.warn(f'Invalid url for camera {camera_id}: {camera_url}')
+        try:
+            if match:
+                login = match.group(1)
+                password = match.group(2)
+                camera_url = camera_url.replace(f'{login}:{password}', f'{cfg.cam_login}:{cfg.cam_password}')
+            else:
+                logger.error(f'Invalid url for camera {camera_id}: {camera_url}\n{exc}')
+    
+        except Exception as exc:
+            logger.error(exc)
 
         return camera_url
     
@@ -187,7 +191,7 @@ class Camera(Base):
         *,
         db_session: AsyncSession,
         camera_id: int
-    ) -> 'Camera':
+    ) -> list:
 
         camera = await db_session.execute(
             select(Camera).filter(

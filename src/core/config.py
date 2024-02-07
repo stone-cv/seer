@@ -29,6 +29,8 @@ fps = config['Application']['fps']
 # camera auth
 cam_login = config['Camera_auth']['login']
 cam_password = config['Camera_auth']['password']
+recorder_ip = config['Camera_auth']['recorder_ip']
+channel = config['Camera_auth']['channel']
 
 # saw logic
 saw_moving_sec = config['Saw_logic']['saw_moving_sec']

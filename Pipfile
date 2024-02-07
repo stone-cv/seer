@@ -58,6 +58,9 @@ asyncpg = "*"
 greenlet = "*"
 alembic = "*"
 psycopg2 = "*"
+httpx = "*"
+lxml = "*"
+aiofiles = "*"
 
 [dev-packages]
 

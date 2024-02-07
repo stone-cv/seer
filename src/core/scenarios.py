@@ -179,6 +179,7 @@ async def check_for_motion(
 
             # clear history
             saw_track_magn = 0
+            logger.debug('Saw magnitude nullified')
             xywh_history.clear()
 
     return saw_track_magn, already_moving
@@ -221,13 +222,13 @@ async def check_if_object_present(
         object_history.append(False)
     detected_class_ids.clear()
     
-    logger.debug(f'Stone history: {object_history}')
     if len(object_history) >= curr_fps * cfg.stone_check_sec:
         true_count = object_history.count(True)
         if true_count > len(object_history) // 2:
             stone_present = True
         else:
             stone_present = False
+        logger.debug(f'Stone history: True - {true_count}, False - {object_history.count(False)}')
         
         if stone_present and not object_already_present:
             event = await Event.event_create(
@@ -250,6 +251,7 @@ async def check_if_object_present(
             object_already_present = False
 
         object_history.clear()
+        logger.debug('Stone history cleared')
 
     return object_already_present
 

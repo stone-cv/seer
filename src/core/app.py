@@ -157,6 +157,9 @@ async def process_live_video(
     # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
     # tracker = Tracker()
 
+    start_time = datetime.now()
+    frame_idx = 1
+
     # variables for saw logic
     saw_xywh_history = []
     saw_track_magn = 0
@@ -187,7 +190,8 @@ async def process_live_video(
                     break
 
                 detection_time = datetime.now()
-                logger.debug(f'Detection time: {detection_time}')
+                calculated_time = start_time + timedelta(seconds=frame_idx/video_fps)
+                logger.debug(f'Detection time: {detection_time}, calculated time: {calculated_time}')
 
                 results = detector.track_custom(source=frame)
                 # results = detector.predict_custom(source=frame)
@@ -244,6 +248,9 @@ async def process_live_video(
                     #     logger.debug(f'Track ID: {track_id}')
 
                 logger.debug(f'results: {frame_pred}')
+
+                frame_idx += 1
+                logger.debug(f'Frame index: {frame_idx}')
 
     except Exception as exc:
         logger.error(exc)

@@ -49,7 +49,7 @@ async def process_video_file(
     
     frame_generator = extract_frame(
             video_path=video_path,
-            fps=cfg.fps
+            fps=cfg.required_fps
         )
 
     # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)

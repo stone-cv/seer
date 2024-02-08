@@ -24,7 +24,7 @@ DEBUG = config['Application']['DEBUG']
 log_dir = config['Application']['log_dir']
 results_dir = config['Application']['results_dir']
 video_path = config['Application']['video_path']
-fps = config['Application']['fps']
+required_fps = config['Application']['required_fps']
 
 # camera auth
 cam_login = config['Camera_auth']['login']

@@ -1,58 +1,33 @@
 import os
-import uuid
 import asyncio
-import time
-import datetime
+import time  #?
 import httpx
 import traceback
 import aiofiles
+from datetime import datetime
 
 from lxml import etree
-
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 import core.config as cfg
 from core.logger import logger
+from core.utils import xml_helper
 
 
-def xml_helper(
-        start_time: datetime.datetime,
-        end_time: datetime.datetime,
-        track_id: int
-) -> str:
-    """ формат lxml файла для передачи параметров поиска файлов"""
-    max_result = 1300
-    search_position = 0
-    search_id = uuid.uuid4()
-    metadata = '//recordType.meta.std-cgi.com'
-
-    if isinstance(start_time, (datetime.datetime, datetime.date)): # Пока грубая проверка. В следующей версии будет все на Typing и передаваться будет строго datetime.
-        start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
-
-    if isinstance(end_time, datetime.datetime):
-        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
-
-    xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
-            f'<trackList><trackID>{track_id}</trackID></trackList>' \
-            f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
-            f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
-            f'<maxResults>{max_result}</maxResults>' \
-            f'<searchResultPostion>{search_position}</searchResultPostion>' \
-            f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
-            f'</CMSearchDescription> '
-    logger.debug(xml_string)
-
-    return xml_string
+start_time = datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))  # Moscow timezone ?
+end_time = datetime.fromisoformat("2024-02-06T17:59:59Z".replace("Z", "+00:00"))  # Moscow timezone ?
 
 
-def unix_time_from_file(file_time: str) -> int:
-    datetime_obj = datetime.datetime.fromisoformat(file_time.replace("Z", "+00:00"))
+def unix_time_from_file(file_time: str) -> int:  # copied
+    datetime_obj = datetime.fromisoformat(file_time.replace("Z", "+03:00"))  # Moscow timezone
     return int(datetime_obj.timestamp())
 
 
 async def get_files_list(
     channel: int,
-    recorder_ip: str
+    recorder_ip: str,
+    start_time: datetime,
+    end_time: datetime
 ) -> dict:
     """
 
@@ -62,9 +37,6 @@ async def get_files_list(
     :param  recorder
     :return: Словарь с данными с видеорегистратора.
     """
-
-    start_time = datetime.datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))
-    end_time = datetime.datetime.fromisoformat("2024-02-06T17:59:59Z".replace("Z", "+00:00"))
 
     files_dict = {}
 
@@ -109,7 +81,8 @@ async def get_files_list(
                 continue
             items.append(d)
     files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
-    logger.debug(f'{len(files_dict[channel])} files retrieved for download: {files_dict}')
+    logger.info(f'{len(files_dict[channel])} files retrieved for download')
+    logger.debug(f'Files retrieved for download: {files_dict}')
 
     return files_dict
 
@@ -121,10 +94,10 @@ async def download_files(
 ) -> None:
 
     for data in files_dict[channel]:
-        print(data)
-        date_folder_name = f"{data['startTime'][:10]}_test02"
-        file_name = f"{data['trackID']}_" + data['playbackURI'].split('&')[-2].replace('name=', '') + \
-                f"_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}" + ".mp4"
+        date_folder_name = f"{data['startTime'][:10]}"  # redo
+        # file_name = f"{data['trackID']}_" + data['playbackURI'].split('&')[-2].replace('name=', '') + \
+        #         f"_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}" + ".mp4"
+        file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
 
         reg_path = f'static/{date_folder_name}'
 
@@ -167,7 +140,7 @@ async def download_files(
                                 continue
 
                             total_size_in_bytes = int(response.headers.get('content-length', 0))
-
+ 
                             logger.info(f"File size in bytes {total_size_in_bytes}")
 
                             bt = time.perf_counter()
@@ -177,14 +150,15 @@ async def download_files(
                                     await video_file.write(chunk)
 
                             et = time.perf_counter() - bt
-                            dw = (total_size_in_bytes / (datetime.datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
+                            dw = (total_size_in_bytes / (datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
                             logger.info(f"File {file_name}; time { et } s; speed { dw } mb/s")
 
                             success = True
+                            logger.info(f"File {file_name} downloaded")
 
                     except httpx.TimeoutException as exc:
                         retry_count += 1
-                        logger.error(f"Download task TimeoutError\n Data id: , Rety count: {retry_count}\n {exc} {traceback.format_exc()}")
+                        logger.error(f"Download task TimeoutError\n Data id: , retry count: {retry_count}\n {exc} {traceback.format_exc()}")
 
                     await asyncio.sleep(5)
 
@@ -195,7 +169,9 @@ async def download_files(
 if __name__ == "__main__":
     files_dict = asyncio.run(get_files_list(
         channel=cfg.channel,
-        recorder_ip=cfg.recorder_ip
+        recorder_ip=cfg.recorder_ip,
+        start_time=start_time,
+        end_time=end_time
     ))
     asyncio.run(download_files(
         channel=cfg.channel,

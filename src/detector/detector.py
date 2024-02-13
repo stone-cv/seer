@@ -33,7 +33,7 @@ class ObjectDetection:
     def load_model(self):
        
         # model = YOLO("yolov8m.pt")  # load a pretrained YOLOv8n model
-        model = YOLO("best.pt")
+        model = YOLO(cfg.weights_path)
         model.fuse()
     
         return model

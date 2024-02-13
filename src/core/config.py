@@ -25,6 +25,7 @@ log_dir = config['Application']['log_dir']
 results_dir = config['Application']['results_dir']
 video_path = config['Application']['video_path']
 required_fps = config['Application']['required_fps']
+weights_path = config['Application']['weights_path']
 
 # camera auth
 cam_login = config['Camera_auth']['login']

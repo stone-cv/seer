@@ -14,9 +14,11 @@ from core.logger import logger
 from core.utils import xml_helper
 
 
-start_time = datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))  # Moscow timezone ?
-end_time = datetime.fromisoformat("2024-02-06T17:59:59Z".replace("Z", "+00:00"))  # Moscow timezone ?
+start_time = datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))  # timezone ?
+end_time = datetime.fromisoformat("2024-02-06T17:59:59Z".replace("Z", "+00:00"))  # timezone ?
 
+
+# TODO: check for free space
 
 def unix_time_from_file(file_time: str) -> int:  # copied
     datetime_obj = datetime.fromisoformat(file_time.replace("Z", "+03:00"))  # Moscow timezone
@@ -59,7 +61,8 @@ async def get_files_list(
     items = []
 
     if len(root.getchildren()) > 4:
-        video_list = root.getchildren()[4].getchildren()[:-1]
+        video_list = root.getchildren()[4].getchildren()[:-1]  # why -1 ?
+        # video_list = root.getchildren()[4].getchildren()
         for match in video_list:
             d = {}
             for el in match.getchildren():
@@ -99,7 +102,8 @@ async def download_files(
         #         f"_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}" + ".mp4"
         file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
 
-        reg_path = f'static/{date_folder_name}'
+        # reg_path = f'static/{date_folder_name}'
+        reg_path = f'static/for_annotation'
 
         if not os.path.exists(reg_path):
             os.makedirs(reg_path, exist_ok=True)

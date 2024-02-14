@@ -1,5 +1,8 @@
+import os
 import cv2
 import csv
+import random
+import shutil
 import numpy as np
 import supervision as sv
 
@@ -32,24 +35,54 @@ class ObjectDetection:
 
     def load_model(self):
        
-        # model = YOLO("yolov8m.pt")  # load a pretrained YOLOv8n model
+        # model = YOLO("yolov8l.pt")  # load a pretrained YOLOv8n model
         model = YOLO(cfg.weights_path)
         model.fuse()
     
         return model
     
 
-    def train_custom(self, data):
+    def train_custom(self, data, split_required):
 
-        # train_X, val_X, train_y, val_y = train_test_split(X_shuffled, y_shuffled, test_size=0.2, random_state=42)
+        def split_dataset():
+            dataset_txt_path = "datasets/obj_train_data"
+            dataset_images_path = "datasets/images_train"
+            train_path = "datasets/datasets/train"
+            val_path = "datasets/datasets/val"
 
-        task = Task.init(project_name="stone-cv", task_name="training02")
+            train_ratio = 0.8
+
+            annotation_files = os.listdir(dataset_txt_path)
+            random.shuffle(annotation_files)
+
+            num_files = len(annotation_files)
+            num_train = int(num_files * train_ratio)
+
+            train_files = annotation_files[:num_train]
+            val_files = annotation_files[num_train:]
+
+            for file in train_files:
+                logger.debug(file)
+                if file.startswith('vlcsnap'):
+                    shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{train_path}/labels', file))
+                    shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{train_path}/images', file.split(".")[0] + ".png"))
+
+            for file in val_files:
+                logger.debug(file)
+                if file.startswith('vlcsnap'):
+                    shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{val_path}/labels', file))
+                    shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{val_path}/images', file.split(".")[0] + ".png"))
+
+        task = Task.init(project_name="stone-cv", task_name=f"training_{time()}")
+
+        if split_required:
+            split_dataset()
 
         results = self.model.train(
             data=data,
             epochs=10,
             batch=8,
-            device='mps'
+            device='cpu'
         )
 
         return results

@@ -18,6 +18,8 @@ async def main():
     logger.info('App initiated')
     detector = ObjectDetection(capture_index=0)  # here? source?
 
+    queue = asyncio.Queue()
+
     """ create db """
     # async with db_engine.begin() as conn:
     #     await conn.run_sync(Base.metadata.drop_all)
@@ -25,31 +27,38 @@ async def main():
     #     logger.info('DB metadata created')
 
     """ train model """
-    # logger.info(f'Training started')
-    # detector.train_custom(data='datasets/data.yaml')
-    # logger.info(f'Training complete')
+    logger.info(f'Training started')
+    detector.train_custom(
+        data='datasets/data.yaml',
+        split_required=False
+    )
+    logger.info(f'Training complete')
 
     """ download files """
     # files_dict = await get_files_list(
     #     channel=cfg.channel,
     #     recorder_ip=cfg.recorder_ip,
-    #     start_time=datetime.datetime.fromisoformat("2024-02-08T14:00:00Z".replace("Z", "+03:00")),  # Moscow timezone ?
-    #     end_time=datetime.datetime.fromisoformat("2024-02-08T14:59:59Z".replace("Z", "+03:00"))  # Moscow timezone ?
+    #     start_time=datetime.datetime.fromisoformat("2024-02-14T11:00:00Z".replace("Z", "+03:00")),  # Moscow timezone ?
+    #     end_time=datetime.datetime.fromisoformat("2024-02-14T11:59:59Z".replace("Z", "+03:00"))  # Moscow timezone ?
     # )
     # await download_files(
     #     channel=cfg.channel,
     #     recorder_ip=cfg.recorder_ip,
-    #     files_dict=files_dict
+    #     files_dict=files_dict,
+    #     queue=queue
     # )
 
     """ process video & detect objects """
-    # for video in config.videos:
     logger.info('Detection started')
-    await process_video_file(
-        detector=detector,
-        video_path=cfg.video_path,
-        camera_id=1  # deafult for now
-    )
+
+    # while not queue.empty():
+    #     logger.debug(f'Processing video queue size: {queue.qsize()}')
+    #     video_file = await queue.get()
+    #     await process_video_file(
+    #         detector=detector,
+    #         video_path=video_file,
+    #         camera_id=1  # deafult for now
+    #     )
     # await process_live_video(
     #     detector=detector,
     #     camera_id=1  # deafult for now

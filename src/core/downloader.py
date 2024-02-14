@@ -64,7 +64,7 @@ async def get_files_list(
     if len(root.getchildren()) > 4:
         video_list = root.getchildren()[4].getchildren()[:-1]  # the last file is still being recorded
         for match in video_list:
-            d = {}
+            data = {}
             for el in match.getchildren():
                 del_url = [
                     '{http://www.hikvision.com/ver20/XMLSchema}',
@@ -75,14 +75,17 @@ async def get_files_list(
                 for url in del_url:
                     if el.text != '\n':
                         dict_key = el.tag.replace(url, '') if url in el.tag else el.tag
-                        d[dict_key] = el.text
+                        data[dict_key] = el.text
                     else:
                         for el_ch in el.getchildren():
                             dict_key = el_ch.tag.replace(url, '')if url in el_ch.tag else el_ch.tag
-                            d[dict_key] = el_ch.text
-            if d['startTime'] == d['endTime']:
+                            data[dict_key] = el_ch.text
+            if data['startTime'] == data['endTime']:
                 continue
-            items.append(d)
+            items.append(data)
+
+            # await self.__queue_download_video.put(datadata)
+
     files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
     logger.info(f'{len(files_dict[channel])} files retrieved for download')
     logger.debug(f'Files retrieved for download: {files_dict}')
@@ -93,88 +96,90 @@ async def get_files_list(
 async def download_files(
         channel: int,
         recorder_ip: str,
-        files_dict: dict,
+        data: dict,
         queue: asyncio.Queue
 ) -> None:
 
-    for data in files_dict[channel]:
-        date_folder_name = f"{data['startTime'][:10]}"  # redo
-        # file_name = f"{data['trackID']}_" + data['playbackURI'].split('&')[-2].replace('name=', '') + \
-        #         f"_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}" + ".mp4"
-        file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
+    # for data in files_dict[channel]:
 
-        reg_path = f'static/{date_folder_name}'
-        # reg_path = f'static/for_annotation'
+    date_folder_name = f"{data['startTime'][:10]}"  # redo
+    # file_name = f"{data['trackID']}_" + data['playbackURI'].split('&')[-2].replace('name=', '') + \
+    #         f"_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}" + ".mp4"
+    file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
 
-        if not os.path.exists(reg_path):
-            os.makedirs(reg_path, exist_ok=True)
+    reg_path = f'static/{date_folder_name}'
+    # reg_path = f'static/for_annotation'
 
-        data_filepath = os.path.join(reg_path, file_name)
+    if not os.path.exists(reg_path):
+        os.makedirs(reg_path, exist_ok=True)
 
-        # Начинаем загрузку файлов
-        api_url = f'http://{recorder_ip}/ISAPI/'
-        download_url = api_url + 'ContentMgmt/download'
-        playback_uri = data['playbackURI']
-        download_xml = f'<downloadRequest version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema">' \
-                        f'<playbackURI>{playback_uri}</playbackURI></downloadRequest>'
+    data_filepath = os.path.join(reg_path, file_name)
 
-        try:
-            retry_count = 0
-            last_status_code = 0
-            success = False
+    # Начинаем загрузку файлов
+    api_url = f'http://{recorder_ip}/ISAPI/'
+    download_url = api_url + 'ContentMgmt/download'
+    playback_uri = data['playbackURI']
+    download_xml = f'<downloadRequest version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema">' \
+                    f'<playbackURI>{playback_uri}</playbackURI></downloadRequest>'
 
-            total_size_in_bytes = 0
+    try:
+        retry_count = 0
+        last_status_code = 0
+        success = False
 
-            async with httpx.AsyncClient() as client:
-                while retry_count <= 10 and not success:
-                    try:
-                        async with client.stream(
-                            'POST',
-                            download_url,
-                            auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
-                            content=download_xml,
-                            timeout=50
-                        ) as response:
-                            logger.info(f"Download task: response {response.status_code}")
+        total_size_in_bytes = 0
 
-                            if response.status_code != 200:
-                                last_status_code = response.status_code
-                                retry_count += 1
-                                logger.warn(f'Download task StatusError: Response status: {response.status_code}. Retry count: {retry_count}.')
-                                await asyncio.sleep(5)
-                                continue
+        async with httpx.AsyncClient() as client:
+            while retry_count <= 10 and not success:
+                try:
+                    async with client.stream(
+                        'POST',
+                        download_url,
+                        auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
+                        content=download_xml,
+                        timeout=50
+                    ) as response:
+                        logger.info(f"Download task: response {response.status_code}")
 
-                            total_size_in_bytes = int(response.headers.get('content-length', 0))
- 
-                            logger.info(f"File size in bytes {total_size_in_bytes}")
+                        if response.status_code != 200:
+                            last_status_code = response.status_code
+                            retry_count += 1
+                            logger.warn(f'Download task StatusError: Response status: {response.status_code}. Retry count: {retry_count}.')
+                            await asyncio.sleep(5)
+                            continue
 
-                            bt = time.perf_counter()
+                        total_size_in_bytes = int(response.headers.get('content-length', 0))
 
-                            async with aiofiles.open(data_filepath, 'wb') as video_file:
-                                progress_bar = tqdm(total=total_size_in_bytes, unit='B', unit_scale=True)
+                        logger.info(f"File size in bytes {total_size_in_bytes}")
 
-                                async for chunk in response.aiter_bytes():
-                                    await video_file.write(chunk)
-                                    progress_bar.update(len(chunk))
+                        bt = time.perf_counter()
 
-                                progress_bar.close()
+                        async with aiofiles.open(data_filepath, 'wb') as video_file:
+                            progress_bar = tqdm(total=total_size_in_bytes, unit='B', unit_scale=True)
 
-                            et = time.perf_counter() - bt
-                            dw = (total_size_in_bytes / (datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
-                            logger.info(f"File {file_name}; time { et } s; speed { dw } mb/s")
+                            async for chunk in response.aiter_bytes():
+                                await video_file.write(chunk)
+                                progress_bar.update(len(chunk))
 
-                            success = True
-                            await queue.put(data_filepath)
-                            logger.info(f"File {file_name} downloaded")
+                            progress_bar.close()
 
-                    except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
-                        retry_count += 1
-                        logger.error(f"Download task TimeoutError\n Data id: , retry count: {retry_count}\n {exc} {traceback.format_exc()}")
+                        et = time.perf_counter() - bt
+                        dw = (total_size_in_bytes / (datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
+                        logger.info(f"File {file_name}; time { et } s; speed { dw } mb/s")
 
-                    await asyncio.sleep(5)
+                        success = True
+                        logger.info(f"File {file_name} downloaded")
 
-        except Exception as exc:  # ?
-            logger.error(exc)
+                except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
+                    retry_count += 1
+                    logger.error(f"Download task TimeoutError\n Data id: , retry count: {retry_count}\n {exc} {traceback.format_exc()}")
+
+                # await asyncio.sleep(5)
+
+    except Exception as exc:  # ?
+        logger.error(exc)
+    
+    return data_filepath
 
 
 if __name__ == "__main__":

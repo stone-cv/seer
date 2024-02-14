@@ -27,7 +27,9 @@ async def process_video_file(
     video_path: str,
     camera_id: int
 ) -> None:
-    
+    """
+    ???
+    """
     frame_generator = extract_frame(
             video_path=video_path,
             fps=cfg.required_fps
@@ -134,7 +136,9 @@ async def process_live_video(
     detector: ObjectDetection,
     camera_id: int
 ) -> None:
-
+    """
+    ???
+    """
     # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
     # tracker = Tracker()
 

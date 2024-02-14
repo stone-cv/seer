@@ -8,8 +8,8 @@ from core.database import db_engine
 from detector.detector import ObjectDetection
 from core.downloader import get_files_list
 from core.downloader import download_files
-from core.app import process_video_file
-from core.app import process_live_video
+from core.scenarios import process_video_file
+from core.scenarios import process_live_video
 from core.models import *
 
 
@@ -57,11 +57,11 @@ async def main():
     #     await process_video_file(
     #         detector=detector,
     #         video_path=video_file,
-    #         camera_id=1  # deafult for now
+    #         camera_id=1  # default for now
     #     )
     # await process_live_video(
     #     detector=detector,
-    #     camera_id=1  # deafult for now
+    #     camera_id=1  # default for now
     # )
 
 

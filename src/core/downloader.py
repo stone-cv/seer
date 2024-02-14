@@ -84,7 +84,7 @@ async def get_files_list(
                 continue
             items.append(data)
 
-            # await self.__queue_download_video.put(datadata)
+            # await self.__queue_download_video.put(data)
 
     files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
     logger.info(f'{len(files_dict[channel])} files retrieved for download')

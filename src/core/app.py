@@ -1,23 +1,14 @@
 import asyncio
-
+from typing import List
 from datetime import datetime
 from datetime import timedelta
-from typing import List
 
 from fastapi import FastAPI
 from fastapi import APIRouter
 
 import core.config as cfg
 from core.logger import logger
-# from tracker.tracker import Sort
 from detector.detector import ObjectDetection
-from core.models import Camera
-from core.database import SessionLocal
-from core.utils import extract_frame
-from core.utils import get_time_from_video_path
-from core.scenarios import is_in_roi
-from core.scenarios import check_for_motion
-from core.scenarios import check_if_object_present
 from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
@@ -131,7 +122,7 @@ class Application:
 
             await self.__queue_search_video.put((start_time, end_time))
 
-            # while end_time <= start_time:
+            # while start_time <= end_time:
             #     logger.debug(f'start_time: {start_time}; end_time: {end_time}')
             #     await self.__queue_search_video.put((start_time, end_time))
             #     end_time += timedelta(days=1)
@@ -192,7 +183,7 @@ class Application:
                 await process_video_file(
                     detector=self.__detector,
                     video_path=item,
-                    camera_id=1  # deafult for now
+                    camera_id=1  # default for now
                 )
             except Exception as e:
                 print(e)
@@ -200,10 +191,8 @@ class Application:
                 self.__queue_process_video.task_done()
 
 
-async def main():
-    logger.info("application start")
+async def main():  # move to main.py
     app = Application()
-    # await database.connect()
     app.start()
     try:
         while app.status == 1:

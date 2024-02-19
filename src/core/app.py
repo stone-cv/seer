@@ -12,6 +12,7 @@ from detector.detector import ObjectDetection
 from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
+from core.utils import get_time_from_video_path
 
 
 app = FastAPI(title="Seer")
@@ -20,10 +21,7 @@ api_router = APIRouter()
 
 class Application:
     def __init__(self):
-        self.status: int = 0
-        # self.__url: str = config.get('Application', 'URL')
-        # self.__login: str = config.get('Application', 'login')
-        # self.__password: str = config.get("Application", "password")
+        self.status: int = 0  # 0 - stopped, 1 - running
         self.__detector: ObjectDetection = ObjectDetection(capture_index=0)
         self.__queue_search_video: asyncio.Queue = asyncio.Queue()
         self.__queue_download_video: asyncio.Queue = asyncio.Queue()
@@ -34,13 +32,16 @@ class Application:
         self.__task_generate: asyncio.Task = None
         self.__delay: int = cfg.delay * 60  # min to sec
         self.__deep_archive: int = cfg.deep_archive
+        self.__saw_already_moving: bool = False
+        self.__stone_already_present: bool = False
+        self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
     def start(self):
         # генерируем воркеров для поиска видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__search_video_files())
+            task = asyncio.Task(self.__search_for_video_files())
             self.__tasks_search_video.append(task)
 
         # генерируем воркеров для скачивания видео файлов
@@ -50,11 +51,13 @@ class Application:
 
         # генерируем воркеров для обработки видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__process_file())
+            task = asyncio.Task(self.__process_video_file())
             self.__tasks_process_video.append(task)
 
         # генерируем таск для получения вставки дат и времени в очередь
-        self.__task_generate = asyncio.Task(self.generate_datetime_queue())
+        self.__task_generate = asyncio.Task(self.generate_datetime_queue(
+            start_time=self.__last_video_end
+        ))
 
         # устанавливаем статус апликахе
         self.status = 1
@@ -98,7 +101,7 @@ class Application:
         self.__queue_process_video: asyncio.Queue = asyncio.Queue()
         self.__task_generate: asyncio.Task = None
         for _ in range(1):
-            task = asyncio.Task(self.__search_video_files())
+            task = asyncio.Task(self.__search_for_video_files())
             self.__tasks_search_video.append(task)
 
         # генерируем воркеров для скачивания видео файлов
@@ -108,31 +111,28 @@ class Application:
 
         # генерируем воркеров для обработки видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__process_file())
+            task = asyncio.Task(self.__process_video_file())
             self.__tasks_process_video.append(task)
 
         # генерируем таск для получения вставки дат и времени в очередь
-        self.__task_generate = asyncio.Task(self.generate_datetime_queue())
+        self.__task_generate = asyncio.Task(self.generate_datetime_queue(
+            start_time=self.__last_video_end
+        ))
 
-    async def generate_datetime_queue(self):
-        while True:
-            end_time = datetime.now()  # TODO check which is end and start
-            start_time = end_time - timedelta(minutes=self.__deep_archive)
-            logger.debug(f'start_time: {start_time}; end_time: {end_time}')
+    async def generate_datetime_queue(self, start_time: datetime):
+        """
+        ???
+        """
+        # while True:
+        end_time = datetime.now()
+        # start_time = end_time - timedelta(minutes=self.__deep_archive)
+        logger.debug(f'start_time: {start_time}; end_time: {end_time}')
 
-            await self.__queue_search_video.put((start_time, end_time))
+        await self.__queue_search_video.put((start_time, end_time))
+        
+        # await asyncio.sleep(self.__delay)
 
-            # while start_time <= end_time:
-            #     logger.debug(f'start_time: {start_time}; end_time: {end_time}')
-            #     await self.__queue_search_video.put((start_time, end_time))
-            #     end_time += timedelta(days=1)
-            # while self.__queue_search_video.qsize() != 0 or self.__queue_download_video.qsize() != 0 or self.__queue_process_video.qsize() != 0:
-            #     logger.info(f"Queue not empty; Queue to get data: {self.__queue_search_video.qsize()}; Queue to parse data: {self.__queue_download_video.qsize()}; Queue to save data: {self.__queue_process_video.qsize()}")
-            #     await asyncio.sleep(5)
-            
-            await asyncio.sleep(self.__delay)
-
-    async def __search_video_files(self):
+    async def __search_for_video_files(self):
         """
         ???
         """
@@ -145,8 +145,23 @@ class Application:
                     start_time=start_time,
                     end_time=end_time
                 )
-                await self.__queue_download_video.put(files_dict)  # TODO each file separate
+
+                # if files_dict[cfg.channel] == 0:  # redo
+                #     start_time -= timedelta(minutes=10)  # ?
+                #     logger.debug(f'Start time changed: {start_time}')
+                #     files_dict = await get_files_list(
+                #         channel=cfg.channel,
+                #         recorder_ip=cfg.recorder_ip,
+                #         start_time=start_time,
+                #         end_time=end_time
+                #     )
+                    
+                    # or just keep generating start & end times
+                    # while files_dict[cfg.channel] == 0:
+                    #     await self.__generate_datetime_queue()
+
                 logger.info(f"Successfully retrived files from {start_time} and {end_time}")
+                await self.__queue_download_video.put(files_dict)  # TODO each file separate
 
             except Exception as exc:
                 logger.error(exc)
@@ -164,7 +179,7 @@ class Application:
                     filepath = await download_files(
                         channel=cfg.channel,
                         recorder_ip=cfg.recorder_ip,
-                        files_dict=item
+                        data=item
                     )
                     await self.__queue_process_video.put(filepath)
 
@@ -173,33 +188,29 @@ class Application:
             finally:
                 self.__queue_download_video.task_done()
     
-    async def __process_file(self):
+    async def __process_video_file(self):
         """
         ???
         """
         while True:
+            # TODO check if multiple files were downloaded
+            # while not self.__queue_process_video.empty():
             item = await self.__queue_process_video.get()
             try:
-                await process_video_file(
+                self.__saw_already_moving, self.__stone_already_present = await process_video_file(
                     detector=self.__detector,
                     video_path=item,
-                    camera_id=1  # default for now
+                    camera_id=1,  # default for now
+                    saw_already_moving = self.__saw_already_moving,
+                    stone_already_present = self.__stone_already_present
                 )
+                _, self.__last_video_end = get_time_from_video_path(item)
             except Exception as e:
                 print(e)
             finally:
                 self.__queue_process_video.task_done()
-
-
-async def main():  # move to main.py
-    app = Application()
-    app.start()
-    try:
-        while app.status == 1:
-            await asyncio.sleep(5)
-    except KeyboardInterrupt:
-        app.stop()
-
-
-if __name__ == '__main__':
-    asyncio.run(main())
+        
+                # снова генерим даты для нового видео
+                await self.generate_datetime_queue(
+                    start_time=self.__last_video_end+timedelta(minutes=1)  # ?
+                )

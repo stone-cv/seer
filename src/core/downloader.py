@@ -96,8 +96,7 @@ async def get_files_list(
 async def download_files(
         channel: int,
         recorder_ip: str,
-        data: dict,
-        queue: asyncio.Queue
+        data: dict
 ) -> None:
 
     # for data in files_dict[channel]:
@@ -122,64 +121,62 @@ async def download_files(
     download_xml = f'<downloadRequest version="1.0" xmlns="http://www.isapi.org/ver20/XMLSchema">' \
                     f'<playbackURI>{playback_uri}</playbackURI></downloadRequest>'
 
-    try:
-        retry_count = 0
-        last_status_code = 0
-        success = False
+    retry_count = 0
+    last_status_code = 0
+    success = False
 
-        total_size_in_bytes = 0
+    total_size_in_bytes = 0
 
-        async with httpx.AsyncClient() as client:
-            while retry_count <= 10 and not success:
-                try:
-                    async with client.stream(
-                        'POST',
-                        download_url,
-                        auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
-                        content=download_xml,
-                        timeout=50
-                    ) as response:
-                        logger.info(f"Download task: response {response.status_code}")
+    async with httpx.AsyncClient() as client:
+        while retry_count <= 10 and not success:
+            try:
+                async with client.stream(
+                    'POST',
+                    download_url,
+                    auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
+                    content=download_xml,
+                    timeout=50
+                ) as response:
+                    logger.info(f"Download task: response {response.status_code}")
 
-                        if response.status_code != 200:
-                            last_status_code = response.status_code
-                            retry_count += 1
-                            logger.warn(f'Download task StatusError: Response status: {response.status_code}. Retry count: {retry_count}.')
-                            await asyncio.sleep(5)
-                            continue
+                    if response.status_code != 200:
+                        last_status_code = response.status_code
+                        retry_count += 1
+                        logger.error(f'Download task StatusError: Response status: {response.status_code}. Retry count: {retry_count}.')
+                        await asyncio.sleep(5)
+                        continue
 
-                        total_size_in_bytes = int(response.headers.get('content-length', 0))
+                    total_size_in_bytes = int(response.headers.get('content-length', 0))
 
-                        logger.info(f"File size in bytes {total_size_in_bytes}")
+                    logger.info(f"File size in bytes {total_size_in_bytes}")
 
-                        bt = time.perf_counter()
+                    bt = time.perf_counter()
 
-                        async with aiofiles.open(data_filepath, 'wb') as video_file:
-                            progress_bar = tqdm(total=total_size_in_bytes, unit='B', unit_scale=True)
+                    async with aiofiles.open(data_filepath, 'wb') as video_file:
+                        progress_bar = tqdm(total=total_size_in_bytes, unit='B', unit_scale=True)
 
-                            async for chunk in response.aiter_bytes():
-                                await video_file.write(chunk)
-                                progress_bar.update(len(chunk))
+                        async for chunk in response.aiter_bytes():
+                            await video_file.write(chunk)
+                            progress_bar.update(len(chunk))
 
-                            progress_bar.close()
+                        progress_bar.close()
 
-                        et = time.perf_counter() - bt
-                        dw = (total_size_in_bytes / (datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
-                        logger.info(f"File {file_name}; time { et } s; speed { dw } mb/s")
+                    et = time.perf_counter() - bt
+                    dw = (total_size_in_bytes / (datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
+                    logger.info(f"File {file_name}; time { et } s; speed { dw } mb/s")
 
-                        success = True
-                        logger.info(f"File {file_name} downloaded")
+                    success = True
+                    logger.info(f"File {file_name} downloaded")
 
-                except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
-                    retry_count += 1
-                    logger.error(f"Download task TimeoutError\n Data id: , retry count: {retry_count}\n {exc} {traceback.format_exc()}")
+            except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
+            # except Exception as exc:
+                retry_count += 1
+                logger.error(f"Download task TimeoutError\n Data id: , retry count: {retry_count}\n {exc} {traceback.format_exc()}")
 
-                # await asyncio.sleep(5)
-
-    except Exception as exc:  # ?
-        logger.error(exc)
+            await asyncio.sleep(5)
     
-    return data_filepath
+    if success:
+        return data_filepath
 
 
 if __name__ == "__main__":

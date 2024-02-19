@@ -5,6 +5,8 @@ from typing import Any
 from typing import List
 
 from core.logger import logger
+from core.models import Camera
+from core.database import SessionLocal
 
 
 def extract_frame(
@@ -40,6 +42,10 @@ def extract_frame(
             break
         if frame_idx % frame_interval == 0:
             frame_count += 1
+
+            # scale_factor = 0.5
+            # frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor)
+
             yield frame, frame_idx, video_fps, fps
         frame_idx += 1
 
@@ -47,7 +53,6 @@ def extract_frame(
     cv2.destroyAllWindows()
 
     logger.info(f'Extracted {frame_count} frames from {video_path}')
-    return  # ?
 
 
 def get_time_from_video_path(
@@ -117,12 +122,19 @@ def create_camera_roi(frame) -> list():  # doesn't work
     Returns:
         roi_points (List(tuple)): координаты области интереса
     """
-    # Initialize variables
+    pass
+
+
+if __name__ == '__main__':
+
+    # Implementation of create_camera_roi()
+
     drawing = False
     roi_points = []
+    frame = "../static/1.png"
 
     # Load the image or video frame
-    frame = cv2.imread("static/0.jpg")
+    frame = cv2.imread(frame)
 
     def draw_roi(event, x, y, flags, param):
         global roi_points, drawing  # eww
@@ -149,15 +161,18 @@ def create_camera_roi(frame) -> list():  # doesn't work
         if key == ord("r"):
             # Reset the ROI
             roi_points = []
-            frame = cv2.imread("image.jpg")
+            frame = cv2.imread(frame)
         elif key == ord("c"):
             # Confirm the ROI and proceed with further processing
             break
 
-    logger.info(roi_points)
+    # logger.info(roi_points)
+    print(f'Updated ROI coord: {roi_points}') 
     cv2.destroyAllWindows()
-    return roi_points
 
-
-if __name__ == '__main__':
-    create_camera_roi()
+    # async with SessionLocal() as session:
+    #     await Camera.update_camera_roi(
+    #         db_session=session,
+    #         camera_id=1,
+    #         roi_coord=str(roi_points)
+    #     )

@@ -16,17 +16,16 @@ from core.models import Camera
 from core.database import SessionLocal
 from core.utils import extract_frame
 from core.utils import get_time_from_video_path
-from core.scenarios import is_in_roi
-from core.scenarios import check_for_motion
-from core.scenarios import check_if_object_present
 
 
 # combine process file & live in one method
 async def process_video_file(
     detector: ObjectDetection,
     video_path: str,
-    camera_id: int
-) -> None:
+    camera_id: int,
+    saw_already_moving: bool = False,
+    stone_already_present: bool = False
+) -> tuple:
     """
     ???
     """
@@ -44,12 +43,12 @@ async def process_video_file(
     # variables for saw logic
     saw_xywh_history = []
     saw_track_magn = 0
-    already_moving = False
+    # already_moving = False
 
     # variables for stone logic
     class_ids = []
     stone_history = []
-    stone_already_present = False
+    # stone_already_present = False
     
     try:
         async with SessionLocal() as session:
@@ -68,7 +67,7 @@ async def process_video_file(
                 # results = detector.predict_custom(source=frame)
 
                 for result in results:
-                    frame_pred, detections = detector.parse_detections(result)  # detections for an outside tracker
+                    frame_pred = detector.parse_detections(result)  # _ / detections for an outside tracker
 
                     for item in frame_pred:
                         item['time'] = detection_time
@@ -83,12 +82,12 @@ async def process_video_file(
 
                             # saw motion logic
                             if item['class_id'] == 1:  # saw class id
-                                saw_track_magn, already_moving = await check_for_motion(
+                                saw_track_magn, saw_already_moving = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
                                     detected_item=item,
                                     saw_track_magn=saw_track_magn,
-                                    already_moving=already_moving,
+                                    already_moving=saw_already_moving,
                                     curr_fps=curr_fps,
                                     detection_time=detection_time
                                 )
@@ -130,6 +129,9 @@ async def process_video_file(
         video_path=video_path,
         video_fps=video_fps
     )
+    cv2.destroyAllWindows()
+
+    return (saw_already_moving, stone_already_present)
 
 
 async def process_live_video(
@@ -270,8 +272,8 @@ async def is_in_roi(
     if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
         is_in_roi = True
         # logger.debug(f"The object detected is in the ROI")
-    else:
-        logger.debug(f"The object is detected not in the ROI")
+    # else:
+    #     logger.info(f"The object is detected not in the ROI")
 
     return is_in_roi
 

@@ -42,9 +42,7 @@ class ObjectDetection:
         return model
     
 
-    def train_custom(self, data, split_required):
-
-        def split_dataset():
+    def split_dataset():
             dataset_txt_path = "datasets/obj_train_data"
             dataset_images_path = "datasets/images_train"
             train_path = "datasets/datasets/train"
@@ -73,10 +71,13 @@ class ObjectDetection:
                     shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{val_path}/labels', file))
                     shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{val_path}/images', file.split(".")[0] + ".png"))
 
+
+    def train_custom(self, data, split_required):
+
         task = Task.init(project_name="stone-cv", task_name=f"training_{time()}")
 
         if split_required:
-            split_dataset()
+            self.split_dataset()
 
         results = self.model.train(
             data=data,
@@ -153,16 +154,16 @@ class ObjectDetection:
                         "saw_moving": None
                     }
                     frame_pred.append(prediction)
-                    detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)  # for tracker
+                    # detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)  # for tracker
 
                 else:
                     logger.info('No detections')
-                    detections = np.empty((0, 5))  # for tracker
+                    # detections = np.empty((0, 5))  # for tracker
 
         except Exception as e:
             logger.error(e)
         
-        return frame_pred, detections
+        return frame_pred  # detections
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):

@@ -11,14 +11,24 @@ from core.downloader import download_files
 from core.scenarios import process_video_file
 from core.scenarios import process_live_video
 from core.models import *
+from core.app import Application
 
 
 async def main():
 
     logger.info('App initiated')
-    detector = ObjectDetection(capture_index=0)  # here? source?
 
-    queue = asyncio.Queue()
+    """ init application """
+    app = Application()
+    app.start()
+    try:
+        while app.status == 1:
+            await asyncio.sleep(5)
+    except KeyboardInterrupt:
+        app.stop()
+
+    # detector = ObjectDetection(capture_index=0)  # here? source?
+    # queue = asyncio.Queue()
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -27,12 +37,12 @@ async def main():
     #     logger.info('DB metadata created')
 
     """ train model """
-    logger.info(f'Training started')
-    detector.train_custom(
-        data='datasets/data.yaml',
-        split_required=False
-    )
-    logger.info(f'Training complete')
+    # logger.info(f'Training started')
+    # detector.train_custom(
+    #     data='datasets/data.yaml',
+    #     split_required=False
+    # )
+    # logger.info(f'Training complete')
 
     """ download files """
     # files_dict = await get_files_list(
@@ -49,16 +59,13 @@ async def main():
     # )
 
     """ process video & detect objects """
-    logger.info('Detection started')
+    # logger.info('Detection started')
 
-    # while not queue.empty():
-    #     logger.debug(f'Processing video queue size: {queue.qsize()}')
-    #     video_file = await queue.get()
-    #     await process_video_file(
-    #         detector=detector,
-    #         video_path=video_file,
-    #         camera_id=1  # default for now
-    #     )
+    # await process_video_file(
+    #     detector=detector,
+    #     video_path=cfg.video_path,
+    #     camera_id=1  # default for now
+    # )
     # await process_live_video(
     #     detector=detector,
     #     camera_id=1  # default for now
@@ -67,4 +74,3 @@ async def main():
 
 if __name__ == '__main__':
     asyncio.run(main())
-    # uvicorn.run("main:app", port=8000, reload=True)

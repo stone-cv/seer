@@ -42,7 +42,7 @@ class ObjectDetection:
         return model
     
 
-    def split_dataset():
+    def split_dataset(self):
             dataset_txt_path = "datasets/obj_train_data"
             dataset_images_path = "datasets/images_train"
             train_path = "datasets/datasets/train"
@@ -61,13 +61,13 @@ class ObjectDetection:
 
             for file in train_files:
                 logger.debug(file)
-                if file.startswith('vlcsnap'):
+                if file.startswith('vlcsnap') or file.startswith('cropped'):
                     shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{train_path}/labels', file))
                     shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{train_path}/images', file.split(".")[0] + ".png"))
 
             for file in val_files:
                 logger.debug(file)
-                if file.startswith('vlcsnap'):
+                if file.startswith('vlcsnap') or file.startswith('cropped'):
                     shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{val_path}/labels', file))
                     shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{val_path}/images', file.split(".")[0] + ".png"))
 
@@ -79,14 +79,14 @@ class ObjectDetection:
         if split_required:
             self.split_dataset()
 
-        results = self.model.train(
-            data=data,
-            epochs=10,
-            batch=8,
-            device='cpu'
-        )
+        # results = self.model.train(
+        #     data=data,
+        #     epochs=10,
+        #     batch=8,
+        #     device='cpu'
+        # )
 
-        return results
+        # return results
 
 
     def predict_custom(self, frame):

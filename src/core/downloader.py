@@ -1,11 +1,11 @@
 import os
 import asyncio
-import time  #?
 import httpx
 import traceback
 import aiofiles
 
 from datetime import datetime
+from time import perf_counter
 from tqdm import tqdm
 from lxml import etree
 from sqlalchemy.ext.asyncio.session import AsyncSession
@@ -15,8 +15,8 @@ from core.logger import logger
 from core.utils import xml_helper
 
 
-start_time = datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))  # timezone ?
-end_time = datetime.fromisoformat("2024-02-06T17:59:59Z".replace("Z", "+00:00"))  # timezone ?
+# start_time = datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))
+# end_time = datetime.fromisoformat("2024-02-06T17:59:59Z".replace("Z", "+00:00"))
 
 
 # TODO: check for free space
@@ -56,7 +56,7 @@ async def get_files_list(
         )
         logger.debug(response)
 
-    # TODO: Add 401 response handle, because we can fucked this up if login/password is incorrect 
+    # TODO: Add 401 response handle
     root = etree.fromstring(response.text.replace('<?xml version="1.0" encoding="UTF-8" ?>\n', ''))
     logger.debug(root)
     items = []
@@ -84,8 +84,6 @@ async def get_files_list(
                 continue
             items.append(data)
 
-            # await self.__queue_download_video.put(data)
-
     files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
     logger.info(f'{len(files_dict[channel])} files retrieved for download')
     logger.debug(f'Files retrieved for download: {files_dict}')
@@ -102,12 +100,9 @@ async def download_files(
     # for data in files_dict[channel]:
 
     date_folder_name = f"{data['startTime'][:10]}"  # redo
-    # file_name = f"{data['trackID']}_" + data['playbackURI'].split('&')[-2].replace('name=', '') + \
-    #         f"_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}" + ".mp4"
     file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
 
     reg_path = f'static/{date_folder_name}'
-    # reg_path = f'static/for_annotation'
 
     if not os.path.exists(reg_path):
         os.makedirs(reg_path, exist_ok=True)
@@ -122,9 +117,7 @@ async def download_files(
                     f'<playbackURI>{playback_uri}</playbackURI></downloadRequest>'
 
     retry_count = 0
-    last_status_code = 0
     success = False
-
     total_size_in_bytes = 0
 
     async with httpx.AsyncClient() as client:
@@ -137,20 +130,19 @@ async def download_files(
                     content=download_xml,
                     timeout=50
                 ) as response:
-                    logger.info(f"Download task: response {response.status_code}")
+                    logger.debug(f"Download task: response status code {response.status_code}")
 
                     if response.status_code != 200:
-                        last_status_code = response.status_code
                         retry_count += 1
-                        logger.error(f'Download task StatusError: Response status: {response.status_code}. Retry count: {retry_count}.')
+                        logger.error(f'Download task error: response status code {response.status_code}; retry count: {retry_count}.')
                         await asyncio.sleep(5)
                         continue
 
                     total_size_in_bytes = int(response.headers.get('content-length', 0))
 
-                    logger.info(f"File size in bytes {total_size_in_bytes}")
+                    logger.debug(f"File size: {total_size_in_bytes} bytes")
 
-                    bt = time.perf_counter()
+                    bt = perf_counter()
 
                     async with aiofiles.open(data_filepath, 'wb') as video_file:
                         progress_bar = tqdm(total=total_size_in_bytes, unit='B', unit_scale=True)
@@ -161,17 +153,16 @@ async def download_files(
 
                         progress_bar.close()
 
-                    et = time.perf_counter() - bt
+                    et = perf_counter() - bt
                     dw = (total_size_in_bytes / (datetime.now().timestamp() - unix_time_from_file(data['startTime']))) / 1024 / 1024 * 8
-                    logger.info(f"File {file_name}; time { et } s; speed { dw } mb/s")
+                    logger.debug(f"File {file_name}; time {et} s; speed {dw} mb/s")
 
                     success = True
                     logger.info(f"File {file_name} downloaded")
 
             except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
-            # except Exception as exc:
                 retry_count += 1
-                logger.error(f"Download task TimeoutError\n Data id: , retry count: {retry_count}\n {exc} {traceback.format_exc()}")
+                logger.error(f"Download task error\nFile: {file_name}, retry count: {retry_count}\n{exc} {traceback.format_exc()}")
 
             await asyncio.sleep(5)
     
@@ -179,15 +170,5 @@ async def download_files(
         return data_filepath
 
 
-if __name__ == "__main__":
-    files_dict = asyncio.run(get_files_list(
-        channel=cfg.channel,
-        recorder_ip=cfg.recorder_ip,
-        start_time=start_time,
-        end_time=end_time
-    ))
-    asyncio.run(download_files(
-        channel=cfg.channel,
-        recorder_ip=cfg.recorder_ip,
-        files_dict=files_dict
-    ))
+# if __name__ == "__main__":
+    # asyncio.run(ffmpeg_download())

@@ -10,6 +10,7 @@ from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
 from core.scenarios import process_live_video
+from core.utils import crop_images_in_folder
 from core.models import *
 from core.app import Application
 
@@ -19,16 +20,15 @@ async def main():
     logger.info('App initiated')
 
     """ init application """
-    app = Application()
-    app.start()
-    try:
-        while app.status == 1:
-            await asyncio.sleep(5)
-    except KeyboardInterrupt:
-        app.stop()
+    # app = Application()
+    # app.start()
+    # try:
+    #     while app.status == 1:
+    #         await asyncio.sleep(5)
+    # except KeyboardInterrupt:
+    #     app.stop()
 
-    # detector = ObjectDetection(capture_index=0)  # here? source?
-    # queue = asyncio.Queue()
+    detector = ObjectDetection(capture_index=0)  # here? source?
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -37,12 +37,12 @@ async def main():
     #     logger.info('DB metadata created')
 
     """ train model """
-    # logger.info(f'Training started')
-    # detector.train_custom(
-    #     data='datasets/data.yaml',
-    #     split_required=False
-    # )
-    # logger.info(f'Training complete')
+    logger.info(f'Training started')
+    detector.train_custom(
+        data='datasets/data.yaml',
+        split_required=True
+    )
+    logger.info(f'Training complete')
 
     """ download files """
     # files_dict = await get_files_list(

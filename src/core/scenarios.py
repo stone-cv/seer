@@ -29,10 +29,11 @@ async def process_video_file(
     """
     ???
     """
-    frame_generator = extract_frame(
-            video_path=video_path,
-            fps=cfg.required_fps
-        )
+    # frame_generator = extract_frame(
+    #         video_path=video_path,
+    #         camera_roi=camera_roi,
+    #         fps=cfg.required_fps
+    #     )
 
     # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
     # tracker = Tracker()
@@ -57,6 +58,12 @@ async def process_video_file(
                 camera_id=camera_id
             )
 
+            frame_generator = extract_frame(
+                video_path=video_path,
+                camera_roi=camera_roi,
+                fps=cfg.required_fps
+            )
+
             for frame, frame_idx, video_fps, curr_fps in frame_generator:
                 logger.debug(f'Frame ID: {frame_idx}')
 
@@ -73,24 +80,24 @@ async def process_video_file(
                         item['time'] = detection_time
 
                         # ROI check
-                        item_in_roi = await is_in_roi(
-                            roi_xyxy=camera_roi,
-                            object_xyxy=item['xyxy']
-                        )
-                        if item_in_roi:
-                            class_ids.append(item['class_id'])
+                        # item_in_roi = await is_in_roi(
+                        #     roi_xyxy=camera_roi,
+                        #     object_xyxy=item['xyxy']
+                        # )
+                        # if item_in_roi:
+                        class_ids.append(item['class_id'])
 
-                            # saw motion logic
-                            if item['class_id'] == 1:  # saw class id
-                                saw_track_magn, saw_already_moving = await check_for_motion(
-                                    db_session=session,
-                                    xywh_history=saw_xywh_history,
-                                    detected_item=item,
-                                    saw_track_magn=saw_track_magn,
-                                    already_moving=saw_already_moving,
-                                    curr_fps=curr_fps,
-                                    detection_time=detection_time
-                                )
+                        # saw motion logic
+                        if item['class_id'] == 1:  # saw class id
+                            saw_track_magn, saw_already_moving = await check_for_motion(
+                                db_session=session,
+                                xywh_history=saw_xywh_history,
+                                detected_item=item,
+                                saw_track_magn=saw_track_magn,
+                                already_moving=saw_already_moving,
+                                curr_fps=curr_fps,
+                                detection_time=detection_time
+                            )
 
                     # stone logic
                     stone_already_present = await check_if_object_present(

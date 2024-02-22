@@ -119,13 +119,13 @@ class Application:
             start_time=self.__last_video_end
         ))
 
-    async def generate_datetime_queue(self, start_time: datetime):
+    async def generate_datetime_queue(self, start_time: datetime = None):
         """
         ???
         """
         # while True:
         end_time = datetime.now()
-        # start_time = end_time - timedelta(minutes=self.__deep_archive)
+        start_time = end_time - timedelta(minutes=self.__deep_archive)
         logger.debug(f'start_time: {start_time}; end_time: {end_time}')
 
         await self.__queue_search_video.put((start_time, end_time))
@@ -212,5 +212,5 @@ class Application:
         
                 # снова генерим даты для нового видео
                 await self.generate_datetime_queue(
-                    start_time=self.__last_video_end+timedelta(minutes=1)  # ?
+                    # start_time=self.__last_video_end+timedelta(minutes=1)  # ?
                 )

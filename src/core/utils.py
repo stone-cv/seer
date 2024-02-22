@@ -1,3 +1,4 @@
+import os
 import cv2
 import uuid
 from datetime import datetime
@@ -11,22 +12,22 @@ from core.database import SessionLocal
 
 def extract_frame(
         video_path: str,
+        camera_roi: List[tuple],
         fps: int = 5
 ) -> Any:
     """
-    Генератор, извлекающий из видео заданное количество кадров в секунду.
+    Генератор, извлекающий из видео заданное количество кадров в секунду
+    и обрезающий кадры под размер области интереса.
 
     Args:
         video_path (str): путь к видеофайлу
+        camera_roi (List[tuple]): координаты области интереса
         fps (int): желаемое количество кадров в секунду
     
     Returns:
         Возвращает кадры с учетом заданного значения FPS.
     """
     video = cv2.VideoCapture(video_path)
-
-    # video_start_time = video.get(cv2.CAP_PROP_CREATION_TIME)
-    # logger.debug(f'Video start time: {video_start_time}')
 
     video_frame_count = int(video.get(cv2.CAP_PROP_FRAME_COUNT))
     video_fps = video.get(cv2.CAP_PROP_FPS)
@@ -46,13 +47,57 @@ def extract_frame(
             # scale_factor = 0.5
             # frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor)
 
-            yield frame, frame_idx, video_fps, fps
+            # crop frame
+            roi_xmin = int(camera_roi[0][0])
+            roi_ymin = int(camera_roi[0][1])
+            roi_xmax = int(camera_roi[1][0])
+            roi_ymax = int(camera_roi[1][1])
+            cropped_frame = frame[roi_ymin:roi_ymax, roi_xmin:roi_xmax]
+
+            yield cropped_frame, frame_idx, video_fps, fps
         frame_idx += 1
 
     video.release()
     cv2.destroyAllWindows()
 
     logger.info(f'Extracted {frame_count} frames from {video_path}')
+
+
+async def crop_images_in_folder(
+    folder_path: str
+) -> None:
+    """
+    Функция, позволяющая обрезать изображения в папке
+
+    Args:
+        folder_path (str): путь к папке
+    
+    Returns:
+        None
+    """
+    input_directory = folder_path
+    output_directory = f'{folder_path}/cropped_images/'
+    os.makedirs(output_directory, exist_ok=True)
+
+    async with SessionLocal() as session:
+        camera_roi = await Camera.get_roi_by_camera_id(
+            db_session=session,
+            camera_id=1
+        )
+    roi_xmin = int(camera_roi[0][0])
+    roi_ymin = int(camera_roi[0][1])
+    roi_xmax = int(camera_roi[1][0])
+    roi_ymax = int(camera_roi[1][1])
+
+
+    for filename in os.listdir(input_directory):
+        if filename.endswith(".png"):
+            image = cv2.imread(os.path.join(input_directory, filename))
+            cropped_image = image[roi_ymin:roi_ymax, roi_xmin:roi_xmax]
+
+            output_path = os.path.join(output_directory, 'cropped_' + filename)
+            cv2.imwrite(output_path, cropped_image)
+
 
 
 def get_time_from_video_path(

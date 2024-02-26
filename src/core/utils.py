@@ -48,13 +48,13 @@ def extract_frame(
             # frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor)
 
             # crop frame
-            roi_xmin = int(camera_roi[0][0])
-            roi_ymin = int(camera_roi[0][1])
-            roi_xmax = int(camera_roi[1][0])
-            roi_ymax = int(camera_roi[1][1])
-            cropped_frame = frame[roi_ymin:roi_ymax, roi_xmin:roi_xmax]
+            # roi_xmin = int(camera_roi[0][0])
+            # roi_ymin = int(camera_roi[0][1])
+            # roi_xmax = int(camera_roi[1][0])
+            # roi_ymax = int(camera_roi[1][1])
+            # cropped_frame = frame[roi_ymin:roi_ymax, roi_xmin:roi_xmax]
 
-            yield cropped_frame, frame_idx, video_fps, fps
+            yield frame, frame_idx, video_fps, fps
         frame_idx += 1
 
     video.release()

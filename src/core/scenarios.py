@@ -24,7 +24,8 @@ async def process_video_file(
     video_path: str,
     camera_id: int,
     saw_already_moving: bool = False,
-    stone_already_present: bool = False
+    stone_already_present: bool = False,
+    stone_history: List[bool] = []
 ) -> tuple:
     """
     ???
@@ -48,8 +49,9 @@ async def process_video_file(
 
     # variables for stone logic
     class_ids = []
-    stone_history = []
+    # stone_history = []
     # stone_already_present = False
+    forklift_history = []
     
     try:
         async with SessionLocal() as session:
@@ -80,32 +82,33 @@ async def process_video_file(
                         item['time'] = detection_time
 
                         # ROI check
-                        # item_in_roi = await is_in_roi(
-                        #     roi_xyxy=camera_roi,
-                        #     object_xyxy=item['xyxy']
-                        # )
-                        # if item_in_roi:
-                        class_ids.append(item['class_id'])
+                        item_in_roi = await is_in_roi(
+                            roi_xyxy=camera_roi,
+                            object_xyxy=item['xyxy']
+                        )
+                        if item_in_roi:
+                            class_ids.append(item['class_id'])
 
-                        # saw motion logic
-                        if item['class_id'] == 1:  # saw class id
-                            saw_track_magn, saw_already_moving = await check_for_motion(
-                                db_session=session,
-                                xywh_history=saw_xywh_history,
-                                detected_item=item,
-                                saw_track_magn=saw_track_magn,
-                                already_moving=saw_already_moving,
-                                curr_fps=curr_fps,
-                                detection_time=detection_time
-                            )
+                            # saw motion logic
+                            if item['class_id'] == 1:  # saw class id
+                                saw_track_magn, saw_already_moving = await check_for_motion(
+                                    db_session=session,
+                                    xywh_history=saw_xywh_history,
+                                    detected_item=item,
+                                    saw_track_magn=saw_track_magn,
+                                    already_moving=saw_already_moving,
+                                    curr_fps=curr_fps,
+                                    detection_time=detection_time
+                                )
 
                     # stone logic
-                    stone_already_present = await check_if_object_present(
+                    stone_already_present, stone_history = await check_if_object_present(
                         db_session=session,
                         class_id=0,  # stone class id
                         detected_class_ids=class_ids,
                         object_history=stone_history,
                         object_already_present=stone_already_present,
+                        forklift_history=forklift_history,
                         curr_fps=curr_fps,
                         detection_time=detection_time
                     )
@@ -138,12 +141,13 @@ async def process_video_file(
     )
     cv2.destroyAllWindows()
 
-    return (saw_already_moving, stone_already_present)
+    return (saw_already_moving, stone_already_present, stone_history)
 
 
 async def process_live_video(
     detector: ObjectDetection,
-    camera_id: int
+    camera_id: int,
+    fps: int = cfg.required_fps
 ) -> None:
     """
     ???
@@ -174,74 +178,83 @@ async def process_live_video(
                 db_session=session,
                 camera_id=camera_id
             )
+            camera_url = f'{camera_url}/ISAPI/Streaming/channels/201'  # 201 harcoded
 
             video_stream = cv2.VideoCapture(camera_url)
             video_fps = video_stream.get(cv2.CAP_PROP_FPS)
+            frame_interval = int(video_fps / fps)
 
             while True:
                 ret, frame = video_stream.read()
                 if not ret:
                     break
 
-                detection_time = datetime.now()
-                calculated_time = start_time + timedelta(seconds=frame_idx/video_fps)
-                logger.debug(f'Detection time: {detection_time}, calculated time: {calculated_time}')
+                if frame_idx % frame_interval == 0:
+                    roi_xmin = int(camera_roi[0][0])
+                    roi_ymin = int(camera_roi[0][1])
+                    roi_xmax = int(camera_roi[1][0])
+                    roi_ymax = int(camera_roi[1][1])
+                    cropped_frame = frame[roi_ymin:roi_ymax, roi_xmin:roi_xmax]
 
-                results = detector.track_custom(source=frame)
-                # results = detector.predict_custom(source=frame)
+                    detection_time = datetime.now()
+                    calculated_time = start_time + timedelta(seconds=frame_idx/video_fps)
+                    logger.debug(f'Detection time: {detection_time}, calculated time: {calculated_time}')
 
-                for result in results:
-                    frame_pred, detections = detector.parse_detections(result)  # detections for an outside tracker
+                    results = detector.track_custom(source=cropped_frame)
+                    # results = detector.predict_custom(source=frame)
 
-                    for item in frame_pred:
-                        item['time'] = detection_time
+                    for result in results:
+                        frame_pred = detector.parse_detections(result)  # detections for an outside tracker
 
-                        # ROI check
-                        item_in_roi = await is_in_roi(
-                            roi_xyxy=camera_roi,
-                            object_xyxy=item['xyxy']
+                        for item in frame_pred:
+                            item['time'] = detection_time
+
+                            # ROI check
+                            item_in_roi = await is_in_roi(
+                                roi_xyxy=camera_roi,
+                                object_xyxy=item['xyxy']
+                            )
+                            if item_in_roi:
+                                class_ids.append(item['class_id'])
+
+                                # saw motion logic
+                                if item['class_id'] == 1:  # saw class id
+                                    saw_track_magn, already_moving = await check_for_motion(
+                                        db_session=session,
+                                        xywh_history=saw_xywh_history,
+                                        detected_item=item,
+                                        saw_track_magn=saw_track_magn,
+                                        already_moving=already_moving,
+                                        curr_fps=video_fps,
+                                        detection_time=detection_time
+                                    )
+
+                        # stone logic
+                        stone_already_present = await check_if_object_present(
+                            db_session=session,
+                            class_id=0,  # stone class id
+                            detected_class_ids=class_ids,
+                            object_history=stone_history,
+                            object_already_present=stone_already_present,
+                            curr_fps=video_fps,
+                            detection_time=detection_time
                         )
-                        if item_in_roi:
-                            class_ids.append(item['class_id'])
 
-                            # saw motion logic
-                            if item['class_id'] == 1:  # saw class id
-                                saw_track_magn, already_moving = await check_for_motion(
-                                    db_session=session,
-                                    xywh_history=saw_xywh_history,
-                                    detected_item=item,
-                                    saw_track_magn=saw_track_magn,
-                                    already_moving=already_moving,
-                                    curr_fps=video_fps,
-                                    detection_time=detection_time
-                                )
+                        # update tracker
 
-                    # stone logic
-                    stone_already_present = await check_if_object_present(
-                        db_session=session,
-                        class_id=0,  # stone class id
-                        detected_class_ids=class_ids,
-                        object_history=stone_history,
-                        object_already_present=stone_already_present,
-                        curr_fps=video_fps,
-                        detection_time=detection_time
-                    )
+                        # sort
+                        # track_bbs_ids = tracker.update(detections)
+                        # if track_bbs_ids.size != 0:
+                        # track_id = int(track_bbs_ids[0][-1])
 
-                    # update tracker
+                        # deep_sort
+                        # tracker.update(frame, detections)
+                        # for track in tracker.tracks:
+                        #     track_id = track.track_id
+                        #     item["track_id"] = track_id
+                        #     logger.debug(f'Track ID: {track_id}')
 
-                    # sort
-                    # track_bbs_ids = tracker.update(detections)
-                    # if track_bbs_ids.size != 0:
-                    # track_id = int(track_bbs_ids[0][-1])
-
-                    # deep_sort
-                    # tracker.update(frame, detections)
-                    # for track in tracker.tracks:
-                    #     track_id = track.track_id
-                    #     item["track_id"] = track_id
-                    #     logger.debug(f'Track ID: {track_id}')
-
-                logger.debug(f'results: {frame_pred}')
+                    logger.debug(f'results: {frame_pred}')
 
                 frame_idx += 1
                 logger.debug(f'Frame index: {frame_idx}')
@@ -388,7 +401,7 @@ async def check_for_motion(
             )
             saw_track_magn += magnitude
         else:
-            logger.debug(f'Magnitude: {saw_track_magn}')
+            logger.info(f'Magnitude: {saw_track_magn}')
             in_motion = is_moving(
                 magnitude=saw_track_magn,
                 threshold=cfg.saw_moving_threshold
@@ -431,6 +444,7 @@ async def check_if_object_present(
         detected_class_ids: List[int],
         object_history: List[bool],
         object_already_present: bool,
+        forklift_history: List[bool],
         curr_fps: int,
         detection_time: datetime
 ) -> bool:
@@ -460,40 +474,89 @@ async def check_if_object_present(
         object_history.append(True)
     else:
         object_history.append(False)
+    
+    if 2 not in detected_class_ids:  # forklift id - rm hardcoded
+        forklift_history.append(False)
+    else:
+        forklift_history.append(True)  # every frame ?
+
+        if len(forklift_history) >= curr_fps * 5:  # 5 sec - rm hardcoded
+
+            if (
+                forklift_history.count(True) >= len(forklift_history) * 0.8 and
+                not object_already_present and
+                object_history.count(False) >= len(object_history) * 0.8 and
+                all(obj_present_result for obj_present_result in object_history[-10:])
+            ):
+
+                event = await Event.event_create(
+                    db_session=db_session,
+                    type_id=1,  # rm hardcoded id
+                    camera_id=1,  # default
+                    time=detection_time
+                )
+                logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
+                object_already_present = True
+
+                object_history.clear()
+            
+            elif (
+                forklift_history.count(True) >= len(forklift_history) * 0.8 and
+                object_already_present and
+                object_history.count(True) >= len(object_history) * 0.8 and
+                all(not obj_present_result for obj_present_result in object_history[-10:])
+            ):
+
+                event = await Event.event_create(
+                    db_session=db_session,
+                    type_id=2,  # rm hardcoded id
+                    camera_id=1,  # default
+                    time=detection_time
+                )
+                logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
+                object_already_present = False
+
+                object_history.clear()
+
     detected_class_ids.clear()
+    if len(forklift_history) >= curr_fps * 20:  # 5 sec - rm hardcoded
+            forklift_history.clear()
+            logger.debug('Forklift history cleared')
     
     if len(object_history) >= curr_fps * cfg.stone_check_sec:
-        true_count = object_history.count(True)
-        if true_count > len(object_history) // 2:
-            stone_present = True
-        else:
-            stone_present = False
-        logger.debug(f'Stone history: True - {true_count}, False - {object_history.count(False)}')
+        # true_count = object_history.count(True)
+        # if true_count > len(object_history) // 2:
+        #     stone_present = True
+        # else:
+        #     stone_present = False
+        # logger.debug(f'Stone history: True - {true_count}, False - {object_history.count(False)}')
         
-        if stone_present and not object_already_present:
-            event = await Event.event_create(
-                db_session=db_session,
-                type_id=1,  # rm hardcoded id
-                camera_id=1,  # default
-                time=detection_time
-            )
-            logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
-            object_already_present = True
+        # if stone_present and not object_already_present:
+        #     # history of a stone not present + consistent forklift detection + stone is now present
+        #     event = await Event.event_create(
+        #         db_session=db_session,
+        #         type_id=1,  # rm hardcoded id
+        #         camera_id=1,  # default
+        #         time=detection_time
+        #     )
+        #     logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
+        #     object_already_present = True
 
-        elif not stone_present and object_already_present:
-            event = await Event.event_create(
-                db_session=db_session,
-                type_id=2,  # rm hardcoded id
-                camera_id=1,  # default
-                time=detection_time
-            )
-            logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
-            object_already_present = False
+        # elif not stone_present and object_already_present:
+        #     # history of a stone present + consistent forklift detection + stone is now not present
+        #     event = await Event.event_create(
+        #         db_session=db_session,
+        #         type_id=2,  # rm hardcoded id
+        #         camera_id=1,  # default
+        #         time=detection_time
+        #     )
+        #     logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
+        #     object_already_present = False
 
         object_history.clear()
         logger.debug('Stone history cleared')
 
-    return object_already_present
+    return object_already_present, object_history
 
 
 # region currently_not_used

@@ -37,12 +37,12 @@ async def main():
     #     logger.info('DB metadata created')
 
     """ train model """
-    logger.info(f'Training started')
-    detector.train_custom(
-        data='datasets/data.yaml',
-        split_required=True
-    )
-    logger.info(f'Training complete')
+    # logger.info(f'Training started')
+    # detector.train_custom(
+    #     data='datasets/data.yaml',
+    #     split_required=True
+    # )
+    # logger.info(f'Training complete')
 
     """ download files """
     # files_dict = await get_files_list(
@@ -59,13 +59,14 @@ async def main():
     # )
 
     """ process video & detect objects """
-    # logger.info('Detection started')
+    logger.info('Detection started')
 
-    # await process_video_file(
-    #     detector=detector,
-    #     video_path=cfg.video_path,
-    #     camera_id=1  # default for now
-    # )
+    await process_video_file(
+        detector=detector,
+        video_path=cfg.video_path,
+        stone_already_present=True,  # remove
+        camera_id=1  # default for now
+    )
     # await process_live_video(
     #     detector=detector,
     #     camera_id=1  # default for now

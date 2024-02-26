@@ -34,6 +34,7 @@ class Application:
         self.__deep_archive: int = cfg.deep_archive
         self.__saw_already_moving: bool = False
         self.__stone_already_present: bool = False
+        self.__stone_history: List[bool] = []
         self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
@@ -197,12 +198,13 @@ class Application:
             # while not self.__queue_process_video.empty():
             item = await self.__queue_process_video.get()
             try:
-                self.__saw_already_moving, self.__stone_already_present = await process_video_file(
+                self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
                     detector=self.__detector,
                     video_path=item,
                     camera_id=1,  # default for now
                     saw_already_moving = self.__saw_already_moving,
-                    stone_already_present = self.__stone_already_present
+                    stone_already_present = self.__stone_already_present,
+                    stone_history = self.__stone_history
                 )
                 _, self.__last_video_end = get_time_from_video_path(item)
             except Exception as e:

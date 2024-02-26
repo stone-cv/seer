@@ -128,13 +128,15 @@ async def download_files(
                     download_url,
                     auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
                     content=download_xml,
-                    timeout=50
+                    timeout=60
                 ) as response:
                     logger.debug(f"Download task: response status code {response.status_code}")
+                    logger.debug(response)
 
                     if response.status_code != 200:
                         retry_count += 1
                         logger.error(f'Download task error: response status code {response.status_code}; retry count: {retry_count}.')
+                        logger.debug(response)
                         await asyncio.sleep(5)
                         continue
 

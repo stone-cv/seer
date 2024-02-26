@@ -354,12 +354,61 @@ def is_moving(
     return in_motion
 
 
+def convert_xywh_to_xyxy(bbox_xywh):
+    x, y, w, h = bbox_xywh
+    x1 = x
+    y1 = y
+    x2 = x + w
+    y2 = y + h
+    return [x1, y1, x2, y2]
+
+def calculate_iou(box1, box2):
+    # Calculate the intersection area
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    intersection_area = max(0, x2 - x1) * max(0, y2 - y1)
+
+    # Calculate the union area
+    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union_area = area_box1 + area_box2 - intersection_area
+
+    # Calculate IoU
+    iou = intersection_area / union_area
+    return iou
+
+def detect_occlusion(detected_bbox, reference_bbox, size_threshold=0.7, iou_threshold=0.5):
+    # Convert xywh format to xyxy format
+    detected_bbox_xyxy = convert_xywh_to_xyxy(detected_bbox)
+    reference_bbox_xyxy = convert_xywh_to_xyxy(reference_bbox)
+
+    # Calculate the areas of the detected and reference bounding boxes
+    area_detected = detected_bbox[2] * detected_bbox[3]
+    area_reference = reference_bbox[2] * reference_bbox[3]
+
+    # Compare the sizes of the bounding boxes
+    size_difference = area_detected / area_reference
+
+    # Calculate IoU between the two bounding boxes
+    iou = calculate_iou(detected_bbox_xyxy, reference_bbox_xyxy)
+
+    # Check for occlusion based on size difference and IoU threshold
+    if size_difference < size_threshold and iou > iou_threshold:
+        return True
+    else:
+        return False
+
+
 async def check_for_motion(
         db_session: AsyncSession,
         xywh_history: List[List[float]],
         detected_item: dict,
         saw_track_magn: float,
         already_moving: bool,
+        # last_motion: bool,  # TODO check for short motion
         curr_fps: int,
         detection_time: datetime,
         camera_id: int
@@ -406,6 +455,10 @@ async def check_for_motion(
             logger.debug(f'Saw moving: {in_motion}')
 
             if in_motion and not already_moving:
+                # if not detect_occlusion(  # TODO verify against DEFINETLY not occluded bbox. reference size?
+                #     detected_bbox=xywh_history[-2],
+                #     reference_bbox=xywh_history[-1]
+                # ):
                 event = await Event.event_create(
                     db_session=db_session,
                     type_id=3,  # rm hardcoded id
@@ -478,12 +531,13 @@ async def check_if_object_present(
         forklift_history.append(True)
 
         if len(forklift_history) >= curr_fps * cfg.forklift_present_threshold:
+            # obj_present_in_last_frames = all(obj_present_result for obj_present_result in forklift_history[-(curr_fps * cfg.forklift_change_threshold):])
 
             if (
                 forklift_history.count(True) >= len(forklift_history) * cfg.majority_threshold and
                 not object_already_present and
                 object_history.count(False) >= len(object_history) * cfg.majority_threshold and
-                all(obj_present_result for obj_present_result in object_history[-cfg.stone_change_threshold:])
+                all(obj_present_result for obj_present_result in object_history[-(curr_fps * cfg.stone_change_threshold):])
             ):
 
                 event = await Event.event_create(
@@ -501,7 +555,7 @@ async def check_if_object_present(
                 forklift_history.count(True) >= len(forklift_history) * cfg.majority_threshold and
                 object_already_present and
                 object_history.count(True) >= len(object_history) * cfg.majority_threshold and
-                all(not obj_present_result for obj_present_result in object_history[-cfg.stone_change_threshold:])
+                all(not obj_present_result for obj_present_result in object_history[-(curr_fps * cfg.stone_change_threshold):])
             ):
 
                 event = await Event.event_create(
@@ -521,35 +575,6 @@ async def check_if_object_present(
         forklift_history.clear()
     
     if len(object_history) >= curr_fps * cfg.stone_history_threshold:
-        # true_count = object_history.count(True)
-        # if true_count > len(object_history) // 2:
-        #     stone_present = True
-        # else:
-        #     stone_present = False
-        # logger.debug(f'Stone history: True - {true_count}, False - {object_history.count(False)}')
-        
-        # if stone_present and not object_already_present:
-        #     # history of a stone not present + consistent forklift detection + stone is now present
-        #     event = await Event.event_create(
-        #         db_session=db_session,
-        #         type_id=1,  # rm hardcoded id
-        #         camera_id=1,  # default
-        #         time=detection_time
-        #     )
-        #     logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
-        #     object_already_present = True
-
-        # elif not stone_present and object_already_present:
-        #     # history of a stone present + consistent forklift detection + stone is now not present
-        #     event = await Event.event_create(
-        #         db_session=db_session,
-        #         type_id=2,  # rm hardcoded id
-        #         camera_id=1,  # default
-        #         time=detection_time
-        #     )
-        #     logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
-        #     object_already_present = False
-
         object_history.clear()
 
     return object_already_present, object_history

@@ -64,7 +64,7 @@ async def main():
     await process_video_file(
         detector=detector,
         video_path=cfg.video_path,
-        stone_already_present=True,  # remove
+        # stone_already_present=True,  # remove
         camera_id=1  # default for now
     )
     # await process_live_video(

@@ -1,256 +1,218 @@
-import cv2
+import asyncio
+from typing import List
+from datetime import datetime
+from datetime import timedelta
 
 from fastapi import FastAPI
 from fastapi import APIRouter
 
-from datetime import datetime
-from datetime import timedelta
-
 import core.config as cfg
 from core.logger import logger
-# from tracker.tracker import Sort
 from detector.detector import ObjectDetection
-from core.models import Camera
-from core.database import SessionLocal
-from core.utils import extract_frame
+from core.downloader import get_files_list
+from core.downloader import download_files
+from core.scenarios import process_video_file
 from core.utils import get_time_from_video_path
-from core.scenarios import is_in_roi
-from core.scenarios import check_for_motion
-from core.scenarios import check_if_object_present
 
 
 app = FastAPI(title="Seer")
 api_router = APIRouter()
 
-# @app.on_event('startup')
-# async def app_startup() -> None:
-#     """
-#     Событие вызывается когда основное приложение было запущено
 
-#     :return: None
-#     """
-#     pass
+class Application:
+    def __init__(self):
+        self.status: int = 0  # 0 - stopped, 1 - running
+        self.__detector: ObjectDetection = ObjectDetection(capture_index=0)
+        self.__queue_search_video: asyncio.Queue = asyncio.Queue()
+        self.__queue_download_video: asyncio.Queue = asyncio.Queue()
+        self.__queue_process_video: asyncio.Queue = asyncio.Queue()
+        self.__tasks_search_video: List[asyncio.Task] = []
+        self.__tasks_download_video: List[asyncio.Task] = []
+        self.__tasks_process_video: List[asyncio.Task] = []
+        self.__task_generate: asyncio.Task = None
+        self.__delay: int = cfg.delay * 60  # min to sec
+        self.__deep_archive: int = cfg.deep_archive
+        self.__saw_already_moving: bool = False
+        self.__stone_already_present: bool = False
+        self.__stone_history: List[bool] = []
+        self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
+        # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
+        # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
+    def start(self):
+        # генерируем воркеров для поиска видео файлов
+        for _ in range(1):
+            task = asyncio.Task(self.__search_for_video_files())
+            self.__tasks_search_video.append(task)
 
-# @app.on_event('shutdown')
-# async def app_shutdown() -> None:
-#     """
-#     Событие вызывается когда основное приложение было остановлено.
+        # генерируем воркеров для скачивания видео файлов
+        for _ in range(1):
+            task = asyncio.Task(self.__download_video_files())
+            self.__tasks_download_video.append(task)
 
-#     :return: None
-#     """
-#     pass
+        # генерируем воркеров для обработки видео файлов
+        for _ in range(1):
+            task = asyncio.Task(self.__process_video_file())
+            self.__tasks_process_video.append(task)
 
-async def process_video_file(
-    detector: ObjectDetection,
-    video_path: str,
-    camera_id: int
-) -> None:
-    
-    frame_generator = extract_frame(
-            video_path=video_path,
-            fps=cfg.required_fps
-        )
+        # генерируем таск для получения вставки дат и времени в очередь
+        self.__task_generate = asyncio.Task(self.generate_datetime_queue(
+            start_time=self.__last_video_end
+        ))
 
-    # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-    # tracker = Tracker()
+        # устанавливаем статус апликахе
+        self.status = 1
 
-    vid_start_time, _ = get_time_from_video_path(video_path)
-    all_results = {}
+    def stop(self):
+        # останавливаем таски поиска видео файлов
+        for task in self.__tasks_search_video:
+            task.cancel()
 
-    # variables for saw logic
-    saw_xywh_history = []
-    saw_track_magn = 0
-    already_moving = False
+        # останавливаем таски скачивания видео файлов
+        for task in self.__tasks_download_video:
+            task.cancel()
 
-    # variables for stone logic
-    class_ids = []
-    stone_history = []
-    stone_already_present = False
-    
-    try:
-        async with SessionLocal() as session:
-            camera_roi = await Camera.get_roi_by_camera_id(
-                db_session=session,
-                camera_id=camera_id
-            )
+        # останавливаем таски обработки видео файлов
+        for task in self.__tasks_process_video:
+            task.cancel()
 
-            for frame, frame_idx, video_fps, curr_fps in frame_generator:
-                logger.debug(f'Frame ID: {frame_idx}')
+        # отсанавливаем таск для формирования очереди данных
+        self.__task_generate.cancel()
 
-                detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
-                logger.debug(f'Detection time: {detection_time}')
+        # устанавливаем статус аппликахе
+        self.status = 0
 
-                results = detector.track_custom(source=frame)
-                # results = detector.predict_custom(source=frame)
+    def restart(self):
+        # останавливаем таски поиска видео файлов
+        for task in self.__tasks_search_video:
+            task.cancel()
 
-                for result in results:
-                    frame_pred, detections = detector.parse_detections(result)  # detections for an outside tracker
+        # останавливаем таски скачивания видео файлов
+        for task in self.__tasks_download_video:
+            task.cancel()
 
-                    for item in frame_pred:
-                        item['time'] = detection_time
+        # останавливаем таски обработки видео файлов
+        for task in self.__tasks_process_video:
+            task.cancel()
 
-                        # ROI check
-                        item_in_roi = await is_in_roi(
-                            roi_xyxy=camera_roi,
-                            object_xyxy=item['xyxy']
-                        )
-                        if item_in_roi:
-                            class_ids.append(item['class_id'])
+        # отсанавливаем таск для формирования очереди данных
+        self.__task_generate.cancel()
+        self.__queue_search_video: asyncio.Queue = asyncio.Queue()
+        self.__queue_download_video: asyncio.Queue = asyncio.Queue()
+        self.__queue_process_video: asyncio.Queue = asyncio.Queue()
+        self.__task_generate: asyncio.Task = None
+        for _ in range(1):
+            task = asyncio.Task(self.__search_for_video_files())
+            self.__tasks_search_video.append(task)
 
-                            # saw motion logic
-                            if item['class_id'] == 1:  # saw class id
-                                saw_track_magn, already_moving = await check_for_motion(
-                                    db_session=session,
-                                    xywh_history=saw_xywh_history,
-                                    detected_item=item,
-                                    saw_track_magn=saw_track_magn,
-                                    already_moving=already_moving,
-                                    curr_fps=curr_fps,
-                                    detection_time=detection_time
-                                )
+        # генерируем воркеров для скачивания видео файлов
+        for _ in range(1):
+            task = asyncio.Task(self.__download_video_files())
+            self.__tasks_download_video.append(task)
 
-                    # stone logic
-                    stone_already_present = await check_if_object_present(
-                        db_session=session,
-                        class_id=0,  # stone class id
-                        detected_class_ids=class_ids,
-                        object_history=stone_history,
-                        object_already_present=stone_already_present,
-                        curr_fps=curr_fps,
-                        detection_time=detection_time
+        # генерируем воркеров для обработки видео файлов
+        for _ in range(1):
+            task = asyncio.Task(self.__process_video_file())
+            self.__tasks_process_video.append(task)
+
+        # генерируем таск для получения вставки дат и времени в очередь
+        self.__task_generate = asyncio.Task(self.generate_datetime_queue(
+            start_time=self.__last_video_end
+        ))
+
+    async def generate_datetime_queue(self, start_time: datetime = None):
+        """
+        ???
+        """
+        # while True:
+        end_time = datetime.now()
+        start_time = end_time - timedelta(minutes=self.__deep_archive)
+        logger.debug(f'start_time: {start_time}; end_time: {end_time}')
+
+        await self.__queue_search_video.put((start_time, end_time))
+        
+        # await asyncio.sleep(self.__delay)
+
+    async def __search_for_video_files(self):
+        """
+        ???
+        """
+        while True:
+            start_time, end_time = await self.__queue_search_video.get()
+            try:
+                files_dict = await get_files_list(
+                    channel=cfg.channel,
+                    recorder_ip=cfg.recorder_ip,
+                    start_time=start_time,
+                    end_time=end_time
+                )
+
+                # if files_dict[cfg.channel] == 0:  # redo
+                #     start_time -= timedelta(minutes=10)  # ?
+                #     logger.debug(f'Start time changed: {start_time}')
+                #     files_dict = await get_files_list(
+                #         channel=cfg.channel,
+                #         recorder_ip=cfg.recorder_ip,
+                #         start_time=start_time,
+                #         end_time=end_time
+                #     )
+                    
+                    # or just keep generating start & end times
+                    # while files_dict[cfg.channel] == 0:
+                    #     await self.__generate_datetime_queue()
+
+                logger.info(f"Successfully retrived files from {start_time} and {end_time}")
+                await self.__queue_download_video.put(files_dict)  # TODO each file separate
+
+            except Exception as exc:
+                logger.error(exc)
+            finally:
+                self.__queue_search_video.task_done()
+
+    async def __download_video_files(self):
+        """
+        ???
+        """
+        while True:
+            data = await self.__queue_download_video.get()
+            try:
+                for item in data[cfg.channel]:  # redo
+                    filepath = await download_files(
+                        channel=cfg.channel,
+                        recorder_ip=cfg.recorder_ip,
+                        data=item
                     )
+                    await self.__queue_process_video.put(filepath)
 
-                    # update tracker
-
-                    # sort
-                    # track_bbs_ids = tracker.update(detections)
-                    # if track_bbs_ids.size != 0:
-                        # track_id = int(track_bbs_ids[0][-1])
+            except Exception as exc:
+                logger.error(exc)
+            finally:
+                self.__queue_download_video.task_done()
     
-                    # deep_sort
-                    # tracker.update(frame, detections)
-                    # for track in tracker.tracks:
-                    #     track_id = track.track_id
-                    #     item["track_id"] = track_id
-                    #     logger.debug(f'Track ID: {track_id}')
-
-                logger.debug(f'results: {frame_pred}')
-                all_results[frame_idx] = frame_pred
-
-    # except StopIteration:
-    except Exception as exc:
-        logger.error(exc)
-
-    detector.save_detections_to_csv(
-        results_dict=all_results,
-        video_path=video_path,
-        video_fps=video_fps
-    )
-
-
-async def process_live_video(
-    detector: ObjectDetection,
-    camera_id: int
-) -> None:
-
-    # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-    # tracker = Tracker()
-
-    start_time = datetime.now()
-    frame_idx = 1
-
-    # variables for saw logic
-    saw_xywh_history = []
-    saw_track_magn = 0
-    already_moving = False
-
-    # variables for stone logic
-    class_ids = []
-    stone_history = []
-    stone_already_present = False
-
-    try:
-        async with SessionLocal() as session:
-            camera_roi = await Camera.get_roi_by_camera_id(  # just get camera object?
-                db_session=session,
-                camera_id=camera_id
-            )
-            camera_url = await Camera.get_url_by_camera_id(
-                db_session=session,
-                camera_id=camera_id
-            )
-
-            video_stream = cv2.VideoCapture(camera_url)
-            video_fps = video_stream.get(cv2.CAP_PROP_FPS)
-
-            while True:
-                ret, frame = video_stream.read()
-                if not ret:
-                    break
-
-                detection_time = datetime.now()
-                calculated_time = start_time + timedelta(seconds=frame_idx/video_fps)
-                logger.debug(f'Detection time: {detection_time}, calculated time: {calculated_time}')
-
-                results = detector.track_custom(source=frame)
-                # results = detector.predict_custom(source=frame)
-
-                for result in results:
-                    frame_pred, detections = detector.parse_detections(result)  # detections for an outside tracker
-
-                    for item in frame_pred:
-                        item['time'] = detection_time
-
-                        # ROI check
-                        item_in_roi = await is_in_roi(
-                            roi_xyxy=camera_roi,
-                            object_xyxy=item['xyxy']
-                        )
-                        if item_in_roi:
-                            class_ids.append(item['class_id'])
-
-                            # saw motion logic
-                            if item['class_id'] == 1:  # saw class id
-                                saw_track_magn, already_moving = await check_for_motion(
-                                    db_session=session,
-                                    xywh_history=saw_xywh_history,
-                                    detected_item=item,
-                                    saw_track_magn=saw_track_magn,
-                                    already_moving=already_moving,
-                                    curr_fps=video_fps,
-                                    detection_time=detection_time
-                                )
-
-                    # stone logic
-                    stone_already_present = await check_if_object_present(
-                        db_session=session,
-                        class_id=0,  # stone class id
-                        detected_class_ids=class_ids,
-                        object_history=stone_history,
-                        object_already_present=stone_already_present,
-                        curr_fps=video_fps,
-                        detection_time=detection_time
-                    )
-
-                    # update tracker
-
-                    # sort
-                    # track_bbs_ids = tracker.update(detections)
-                    # if track_bbs_ids.size != 0:
-                    # track_id = int(track_bbs_ids[0][-1])
-
-                    # deep_sort
-                    # tracker.update(frame, detections)
-                    # for track in tracker.tracks:
-                    #     track_id = track.track_id
-                    #     item["track_id"] = track_id
-                    #     logger.debug(f'Track ID: {track_id}')
-
-                logger.debug(f'results: {frame_pred}')
-
-                frame_idx += 1
-                logger.debug(f'Frame index: {frame_idx}')
-
-    except Exception as exc:
-        logger.error(exc)
+    async def __process_video_file(self):
+        """
+        ???
+        """
+        while True:
+            # TODO check if multiple files were downloaded
+            # while not self.__queue_process_video.empty():
+            item = await self.__queue_process_video.get()
+            try:
+                self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
+                    detector=self.__detector,
+                    video_path=item,
+                    camera_id=1,  # default for now
+                    saw_already_moving = self.__saw_already_moving,
+                    stone_already_present = self.__stone_already_present,
+                    stone_history = self.__stone_history
+                )
+                _, self.__last_video_end = get_time_from_video_path(item)
+            except Exception as e:
+                print(e)
+            finally:
+                self.__queue_process_video.task_done()
+        
+                # снова генерим даты для нового видео
+                await self.generate_datetime_queue(
+                    # start_time=self.__last_video_end+timedelta(minutes=1)  # ?
+                )

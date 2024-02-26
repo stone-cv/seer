@@ -29,7 +29,7 @@ db_URI = PostgresDsn.build(
 db_engine = create_async_engine(
     db_URI.unicode_string(),
     pool_pre_ping=True,
-    echo=True,
+    echo=False,
     connect_args={
         'server_settings': {
             'application_name': cfg.app_name,

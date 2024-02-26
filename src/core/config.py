@@ -26,6 +26,8 @@ results_dir = config['Application']['results_dir']
 video_path = config['Application']['video_path']
 required_fps = config['Application']['required_fps']
 weights_path = config['Application']['weights_path']
+deep_archive = config['Application']['deep_archive']
+delay = config['Application']['delay']
 
 # camera auth
 cam_login = config['Camera_auth']['login']

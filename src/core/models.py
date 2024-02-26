@@ -155,6 +155,27 @@ class Camera(Base):
         return camera
     
     @staticmethod
+    async def update_camera_roi(
+        *,
+        db_session: AsyncSession,
+        camera_id: int,
+        roi_coord: str
+    ) -> str:
+
+        camera = await db_session.execute(
+            select(Camera).filter(
+                Camera.id == camera_id
+            )
+        )
+        camera = camera.scalars().first()
+        camera.roi = roi_coord
+        logger.info(f'Camera {camera_id} ROI updated: {camera.roi}')
+
+        await db_session.commit()
+
+        return camera
+    
+    @staticmethod
     async def get_url_by_camera_id(
         *,
         db_session: AsyncSession,

@@ -30,12 +30,6 @@ async def process_video_file(
     """
     ???
     """
-    # frame_generator = extract_frame(
-    #         video_path=video_path,
-    #         camera_roi=camera_roi,
-    #         fps=cfg.required_fps
-    #     )
-
     # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
     # tracker = Tracker()
 
@@ -45,12 +39,9 @@ async def process_video_file(
     # variables for saw logic
     saw_xywh_history = []
     saw_track_magn = 0
-    # already_moving = False
 
     # variables for stone logic
     class_ids = []
-    # stone_history = []
-    # stone_already_present = False
     forklift_history = []
     
     try:
@@ -98,19 +89,22 @@ async def process_video_file(
                                     saw_track_magn=saw_track_magn,
                                     already_moving=saw_already_moving,
                                     curr_fps=curr_fps,
-                                    detection_time=detection_time
+                                    detection_time=detection_time,
+                                    camera_id=camera_id
                                 )
 
                     # stone logic
                     stone_already_present, stone_history = await check_if_object_present(
                         db_session=session,
-                        class_id=0,  # stone class id
+                        stone_id=0,  # stone class id
                         detected_class_ids=class_ids,
                         object_history=stone_history,
                         object_already_present=stone_already_present,
+                        forklift_id=2,  # forklift class id
                         forklift_history=forklift_history,
                         curr_fps=curr_fps,
-                        detection_time=detection_time
+                        detection_time=detection_time,
+                        camera_id=camera_id
                     )
 
                     # update tracker
@@ -232,7 +226,7 @@ async def process_live_video(
                         # stone logic
                         stone_already_present = await check_if_object_present(
                             db_session=session,
-                            class_id=0,  # stone class id
+                            stone_id=0,  # stone class id
                             detected_class_ids=class_ids,
                             object_history=stone_history,
                             object_already_present=stone_already_present,
@@ -367,7 +361,8 @@ async def check_for_motion(
         saw_track_magn: float,
         already_moving: bool,
         curr_fps: int,
-        detection_time: datetime
+        detection_time: datetime,
+        camera_id: int
 ) -> (float, bool):
     """
     Функция, позволяющая определить, движется ли объект:
@@ -414,7 +409,7 @@ async def check_for_motion(
                 event = await Event.event_create(
                     db_session=db_session,
                     type_id=3,  # rm hardcoded id
-                    camera_id=1,  # default
+                    camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'The saw started moving at {detection_time}, event created: {event.__dict__}')
@@ -424,7 +419,7 @@ async def check_for_motion(
                 event = await Event.event_create(
                     db_session=db_session,
                     type_id=4,  # rm hardcoded id
-                    camera_id=1,  # default
+                    camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'The saw stopped moving at {detection_time}, event created: {event.__dict__}')
@@ -440,13 +435,15 @@ async def check_for_motion(
 
 async def check_if_object_present(
         db_session: AsyncSession,
-        class_id: int,
         detected_class_ids: List[int],
         object_history: List[bool],
         object_already_present: bool,
         forklift_history: List[bool],
         curr_fps: int,
-        detection_time: datetime
+        detection_time: datetime,
+        camera_id: int,
+        stone_id: int = 0,
+        forklift_id: int = 2
 ) -> bool:
     """
     Функция, позволяющая определить, присутствиует ли на видео объект:
@@ -459,7 +456,7 @@ async def check_if_object_present(
 
     Args:
         db_session (AsyncSession): объект асинхронной сессии БД
-        class_id (int): идентификатор класса детекции, к которому принадлежит объект
+        stone_id (int): идентификатор класса детекции, к которому принадлежит объект
         detected_class_ids (List[int]): список идентификаторов классов детекции, обнаруженных на кадре
         object_history (List[bool]): список значений, обозначающих наличие или отсутствие обьъекта на кадре
         object_already_present (bool): флаг, обозначающий, находился ли объект на видео до текущей проверки
@@ -470,29 +467,29 @@ async def check_if_object_present(
         object_already_present (bool): обновленное значение
     """
     logger.debug(f'Class IDs: {detected_class_ids}')
-    if class_id in detected_class_ids:
+    if stone_id in detected_class_ids:
         object_history.append(True)
     else:
         object_history.append(False)
     
-    if 2 not in detected_class_ids:  # forklift id - rm hardcoded
+    if forklift_id not in detected_class_ids:
         forklift_history.append(False)
     else:
-        forklift_history.append(True)  # every frame ?
+        forklift_history.append(True)
 
-        if len(forklift_history) >= curr_fps * 5:  # 5 sec - rm hardcoded
+        if len(forklift_history) >= curr_fps * cfg.forklift_present_threshold:
 
             if (
-                forklift_history.count(True) >= len(forklift_history) * 0.8 and
+                forklift_history.count(True) >= len(forklift_history) * cfg.majority_threshold and
                 not object_already_present and
-                object_history.count(False) >= len(object_history) * 0.8 and
-                all(obj_present_result for obj_present_result in object_history[-10:])
+                object_history.count(False) >= len(object_history) * cfg.majority_threshold and
+                all(obj_present_result for obj_present_result in object_history[-cfg.stone_change_threshold:])
             ):
 
                 event = await Event.event_create(
                     db_session=db_session,
                     type_id=1,  # rm hardcoded id
-                    camera_id=1,  # default
+                    camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
@@ -501,16 +498,16 @@ async def check_if_object_present(
                 object_history.clear()
             
             elif (
-                forklift_history.count(True) >= len(forklift_history) * 0.8 and
+                forklift_history.count(True) >= len(forklift_history) * cfg.majority_threshold and
                 object_already_present and
-                object_history.count(True) >= len(object_history) * 0.8 and
-                all(not obj_present_result for obj_present_result in object_history[-10:])
+                object_history.count(True) >= len(object_history) * cfg.majority_threshold and
+                all(not obj_present_result for obj_present_result in object_history[-cfg.stone_change_threshold:])
             ):
 
                 event = await Event.event_create(
                     db_session=db_session,
                     type_id=2,  # rm hardcoded id
-                    camera_id=1,  # default
+                    camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
@@ -519,11 +516,11 @@ async def check_if_object_present(
                 object_history.clear()
 
     detected_class_ids.clear()
-    if len(forklift_history) >= curr_fps * 20:  # 5 sec - rm hardcoded
-            forklift_history.clear()
-            logger.debug('Forklift history cleared')
+
+    if len(forklift_history) >= curr_fps * cfg.forklift_history_threshold:
+        forklift_history.clear()
     
-    if len(object_history) >= curr_fps * cfg.stone_check_sec:
+    if len(object_history) >= curr_fps * cfg.stone_history_threshold:
         # true_count = object_history.count(True)
         # if true_count > len(object_history) // 2:
         #     stone_present = True
@@ -554,7 +551,6 @@ async def check_if_object_present(
         #     object_already_present = False
 
         object_history.clear()
-        logger.debug('Stone history cleared')
 
     return object_already_present, object_history
 

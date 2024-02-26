@@ -40,7 +40,11 @@ saw_moving_sec = config['Saw_logic']['saw_moving_sec']
 saw_moving_threshold = config['Saw_logic']['saw_moving_threshold']
 
 # stone logic
-stone_check_sec = config['Stone_logic']['stone_check_sec']
+stone_history_threshold = config['Stone_logic']['stone_history_threshold']
+stone_change_threshold = config['Stone_logic']['stone_change_threshold']
+forklift_history_threshold = config['Stone_logic']['forklift_history_threshold']
+forklift_present_threshold = config['Stone_logic']['forklift_present_threshold']
+majority_threshold = config['Stone_logic']['majority_threshold']
 
 # Database
 db_host = config['Database']['db_host']

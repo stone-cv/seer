@@ -35,7 +35,8 @@ class Application:
         self.__saw_already_moving: bool = False
         self.__stone_already_present: bool = False
         self.__stone_history: List[bool] = []
-        self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
+        # self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
+        self.__last_video_end: datetime = datetime(2024, 2, 27, 12, 10, 9)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -57,7 +58,7 @@ class Application:
 
         # генерируем таск для получения вставки дат и времени в очередь
         self.__task_generate = asyncio.Task(self.generate_datetime_queue(
-            start_time=self.__last_video_end
+            start_time=self.__last_video_end,
         ))
 
         # устанавливаем статус апликахе
@@ -125,8 +126,8 @@ class Application:
         ???
         """
         # while True:
+        start_time = start_time
         end_time = datetime.now()
-        start_time = end_time - timedelta(minutes=self.__deep_archive)
         logger.debug(f'start_time: {start_time}; end_time: {end_time}')
 
         await self.__queue_search_video.put((start_time, end_time))
@@ -147,22 +148,27 @@ class Application:
                     end_time=end_time
                 )
 
-                # if files_dict[cfg.channel] == 0:  # redo
-                #     start_time -= timedelta(minutes=10)  # ?
-                #     logger.debug(f'Start time changed: {start_time}')
-                #     files_dict = await get_files_list(
-                #         channel=cfg.channel,
-                #         recorder_ip=cfg.recorder_ip,
-                #         start_time=start_time,
-                #         end_time=end_time
-                #     )
-                    
-                    # or just keep generating start & end times
-                    # while files_dict[cfg.channel] == 0:
-                    #     await self.__generate_datetime_queue()
-
-                logger.info(f"Successfully retrived files from {start_time} and {end_time}")
-                await self.__queue_download_video.put(files_dict)  # TODO each file separate
+                if len(files_dict[cfg.channel]) == 0:  # redo
+                    logger.info(f"Files not found from {start_time} to {end_time}. Retrying in 60 seconds...")
+                    await asyncio.sleep(60)
+                    await self.generate_datetime_queue(
+                        start_time=self.__last_video_end
+                    )
+                
+                # check if we have already downloaded the file for this time period
+                for item in files_dict[cfg.channel]:  # redo
+                    vid_start = datetime.strptime(item['startTime'], "%Y-%m-%dT%H:%M:%SZ")
+                    if vid_start < self.__last_video_end:
+                        if len(files_dict[cfg.channel]) > 1:
+                            continue
+                        logger.info(f"Video starts ({vid_start}) earlier than the last video ends ({self.__last_video_end}). Retrying in 60 seconds...")
+                        await asyncio.sleep(60)
+                        await self.generate_datetime_queue(
+                            start_time=self.__last_video_end
+                        )
+                    else:
+                        logger.info(f"Successfully retrived file(s) from {start_time} to {end_time}")
+                        await self.__queue_download_video.put(item)
 
             except Exception as exc:
                 logger.error(exc)
@@ -176,13 +182,12 @@ class Application:
         while True:
             data = await self.__queue_download_video.get()
             try:
-                for item in data[cfg.channel]:  # redo
-                    filepath = await download_files(
-                        channel=cfg.channel,
-                        recorder_ip=cfg.recorder_ip,
-                        data=item
-                    )
-                    await self.__queue_process_video.put(filepath)
+                filepath = await download_files(
+                    channel=cfg.channel,
+                    recorder_ip=cfg.recorder_ip,
+                    data=data
+                )
+                await self.__queue_process_video.put(filepath)
 
             except Exception as exc:
                 logger.error(exc)
@@ -194,8 +199,6 @@ class Application:
         ???
         """
         while True:
-            # TODO check if multiple files were downloaded
-            # while not self.__queue_process_video.empty():
             item = await self.__queue_process_video.get()
             try:
                 self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
@@ -214,5 +217,5 @@ class Application:
         
                 # снова генерим даты для нового видео
                 await self.generate_datetime_queue(
-                    # start_time=self.__last_video_end+timedelta(minutes=1)  # ?
+                    start_time=self.__last_video_end
                 )

@@ -118,7 +118,7 @@ class ObjectDetection:
         results = self.model.track(
             source=source,
             persist=True,
-            conf=0.5,
+            conf=0.3,
             iou=0.5,
             device='mps',
             # tracker="bytetrack.yaml",

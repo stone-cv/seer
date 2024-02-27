@@ -85,8 +85,7 @@ async def get_files_list(
             items.append(data)
 
     files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
-    logger.info(f'{len(files_dict[channel])} files retrieved for download')
-    logger.debug(f'Files retrieved for download: {files_dict}')
+    logger.debug(f'{len(files_dict[channel])} file(s) retrieved for download: {files_dict}')
 
     return files_dict
 

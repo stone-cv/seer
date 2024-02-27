@@ -20,15 +20,15 @@ async def main():
     logger.info('App initiated')
 
     """ init application """
-    app = Application()
-    app.start()
-    try:
-        while app.status == 1:
-            await asyncio.sleep(5)
-    except KeyboardInterrupt:
-        app.stop()
+    # app = Application()
+    # app.start()
+    # try:
+    #     while app.status == 1:
+    #         await asyncio.sleep(5)
+    # except KeyboardInterrupt:
+    #     app.stop()
 
-    # detector = ObjectDetection(capture_index=0)  # here? source?
+    detector = ObjectDetection(capture_index=0)  # here? source?
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -61,12 +61,12 @@ async def main():
     """ process video & detect objects """
     # logger.info('Detection started')
 
-    # await process_video_file(
-    #     detector=detector,
-    #     video_path=cfg.video_path,
-    #     # stone_already_present=True,  # remove
-    #     camera_id=1  # default for now
-    # )
+    await process_video_file(
+        detector=detector,
+        video_path=cfg.video_path,
+        stone_already_present=None,
+        camera_id=1  # default for now
+    )
     # await process_live_video(
     #     detector=detector,
     #     camera_id=1  # default for now

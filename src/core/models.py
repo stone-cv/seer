@@ -1,7 +1,8 @@
 import re
 import ast
-import datetime
+import json
 from typing import Optional
+from datetime import datetime
 
 from sqlalchemy import Integer
 from sqlalchemy import String
@@ -67,6 +68,27 @@ class Event(Base):
         await db_session.commit()
 
         return event
+    
+    @staticmethod
+    async def convert_event_to_json(
+        *,
+        db_session: AsyncSession,
+        event: 'Event'
+    ):
+        event_type = await EventType.get_type_by_id(
+            db_session=db_session,
+            type_id=event.type_id
+        )
+
+        event_dict = {
+            'date': event.time.strftime("%Y-%m-%d %H:%M"),
+            'machine': "PW1TK 3000",
+            'operation': event_type.name,
+            'number': "Неизвестно",
+            'comment': "Тестовый документ"
+        }
+        event_json = json.dumps(event_dict)
+        return event_json
 
     @staticmethod
     async def event_delete(
@@ -97,6 +119,22 @@ class EventType(Base):
     event: Mapped['Event'] = relationship(back_populates="event_type")  # ?
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    @staticmethod
+    async def get_type_by_id(
+        *,
+        db_session: AsyncSession,
+        type_id: int
+    ) -> 'EventType':
+
+        event_type = await db_session.execute(
+            select(EventType).filter(
+                EventType.id == type_id
+            )
+        )
+
+        event_type = event_type.scalars().first()
+        return event_type
 
 
 class Camera(Base):

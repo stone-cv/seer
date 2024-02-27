@@ -33,10 +33,10 @@ class Application:
         self.__delay: int = cfg.delay * 60  # min to sec
         self.__deep_archive: int = cfg.deep_archive
         self.__saw_already_moving: bool = False
-        self.__stone_already_present: bool = False
+        self.__stone_already_present: bool = None
         self.__stone_history: List[bool] = []
         # self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
-        self.__last_video_end: datetime = datetime(2024, 2, 27, 12, 10, 9)
+        self.__last_video_end: datetime = datetime(2024, 2, 27, 15, 40, 41)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 

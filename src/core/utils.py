@@ -1,10 +1,12 @@
 import os
 import cv2
 import uuid
+import httpx
 from datetime import datetime
 from typing import Any
 from typing import List
 
+import core.config as cfg
 from core.logger import logger
 from core.models import Camera
 from core.database import SessionLocal
@@ -156,8 +158,31 @@ def xml_helper(  # copied
     return xml_string
 
 
+async def send_event_json(
+    data: dict,
+    url: str = cfg.json_url,
+    auth: str = cfg.json_auth_token
+) -> httpx.Response:
+    headers = {
+        "Content-Type": "application/json",
+        'Authorization': f'Bearer {auth}',
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, headers=headers, json=data)
 
-def create_camera_roi(frame) -> list():  # doesn't work
+            if response.status_code == 200 or response.status_code == 201:  # ?
+                logger.info(f'Request sent successfully. JSON: {data}')
+            else:
+                logger.error(f'Response status code: {response.status_code}')
+
+    except Exception as exc:
+        logger.error(exc)
+
+    # return response
+
+
+def create_camera_roi(frame) -> list():  # doesn't work, implemented in "if __name__ == '__main__'"
     """
     Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
 

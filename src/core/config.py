@@ -29,6 +29,10 @@ weights_path = config['Application']['weights_path']
 deep_archive = config['Application']['deep_archive']
 delay = config['Application']['delay']
 
+send_json = config['Application']['send_json']
+json_url = config['Application']['json_url']
+json_auth_token = config['Application']['json_auth_token']
+
 # camera auth
 cam_login = config['Camera_auth']['login']
 cam_password = config['Camera_auth']['password']

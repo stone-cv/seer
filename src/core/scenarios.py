@@ -15,6 +15,7 @@ from core.models import Event
 from core.models import Camera
 from core.database import SessionLocal
 from core.utils import extract_frame
+from core.utils import send_event_json
 from core.utils import get_time_from_video_path
 
 
@@ -468,6 +469,13 @@ async def check_for_motion(
                 logger.info(f'The saw started moving at {detection_time}, event created: {event.__dict__}')
                 already_moving = True
 
+                if cfg.send_json:
+                    json = await Event.convert_event_to_json(
+                        db_session=db_session,
+                        event=event,
+                    )
+                    await send_event_json(data=json)
+
             elif not in_motion and already_moving:
                 event = await Event.event_create(
                     db_session=db_session,
@@ -477,6 +485,13 @@ async def check_for_motion(
                 )
                 logger.info(f'The saw stopped moving at {detection_time}, event created: {event.__dict__}')
                 already_moving = False
+
+                if cfg.send_json:
+                    json = await Event.convert_event_to_json(
+                        db_session=db_session,
+                        event=event,
+                    )
+                    await send_event_json(data=json)
 
             # clear history
             saw_track_magn = 0
@@ -524,6 +539,14 @@ async def check_if_object_present(
         object_history.append(True)
     else:
         object_history.append(False)
+
+    if object_already_present == None:
+        if len(object_history) >= curr_fps * 10:
+            if object_history.count(True) > object_history.count(False):
+                object_already_present = True
+            else:
+                object_already_present = False
+            logger.info(f'object_already_present set: {object_already_present}')
     
     if forklift_id not in detected_class_ids:
         forklift_history.append(False)
@@ -531,13 +554,15 @@ async def check_if_object_present(
         forklift_history.append(True)
 
         if len(forklift_history) >= curr_fps * cfg.forklift_present_threshold:
-            # obj_present_in_last_frames = all(obj_present_result for obj_present_result in forklift_history[-(curr_fps * cfg.forklift_change_threshold):])
 
             if (
-                forklift_history.count(True) >= len(forklift_history) * cfg.majority_threshold and
+                forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
                 not object_already_present and
-                object_history.count(False) >= len(object_history) * cfg.majority_threshold and
+                object_history.count(False) > len(object_history) * cfg.majority_threshold and
                 all(obj_present_result for obj_present_result in object_history[-(curr_fps * cfg.stone_change_threshold):])
+            ) or (
+                not object_already_present and
+                all(obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
             ):
 
                 event = await Event.event_create(
@@ -549,13 +574,23 @@ async def check_if_object_present(
                 logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
                 object_already_present = True
 
-                object_history.clear()
+                if cfg.send_json:
+                    json = await Event.convert_event_to_json(
+                        db_session=db_session,
+                        event=event,
+                    )
+                    await send_event_json(data=json)
+
+                # object_history.clear()
             
             elif (
-                forklift_history.count(True) >= len(forklift_history) * cfg.majority_threshold and
+                forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
                 object_already_present and
-                object_history.count(True) >= len(object_history) * cfg.majority_threshold and
+                object_history.count(True) > len(object_history) * cfg.majority_threshold and
                 all(not obj_present_result for obj_present_result in object_history[-(curr_fps * cfg.stone_change_threshold):])
+            ) or (
+                object_already_present and
+                all(not obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
             ):
 
                 event = await Event.event_create(
@@ -567,14 +602,65 @@ async def check_if_object_present(
                 logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
                 object_already_present = False
 
-                object_history.clear()
+                if cfg.send_json:
+                    json = await Event.convert_event_to_json(
+                        db_session=db_session,
+                        event=event,
+                    )
+                    await send_event_json(data=json)
+
+                # object_history.clear()
+    
+    # region extra check
+    if (
+        not object_already_present and
+        all(obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
+    ):
+
+        event = await Event.event_create(
+            db_session=db_session,
+            type_id=1,  # rm hardcoded id
+            camera_id=camera_id,
+            time=detection_time-timedelta(minutes=1)
+        )
+        logger.info(f'New stone detected at {detection_time-timedelta(minutes=1)}, event created: {event.__dict__}')
+        object_already_present = True
+
+        if cfg.send_json:
+            json = await Event.convert_event_to_json(
+                db_session=db_session,
+                event=event,
+            )
+            await send_event_json(data=json)
+    
+    elif (
+        object_already_present and
+        all(not obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
+    ):
+
+        event = await Event.event_create(
+            db_session=db_session,
+            type_id=2,  # rm hardcoded id
+            camera_id=camera_id,
+            time=detection_time-timedelta(minutes=1)
+        )
+        logger.info(f'Stone removed at {detection_time-timedelta(minutes=1)}, event created: {event.__dict__}')
+        object_already_present = False
+
+        if cfg.send_json:
+            json = await Event.convert_event_to_json(
+                db_session=db_session,
+                event=event,
+            )
+            await send_event_json(data=json)
+    # endregion
 
     detected_class_ids.clear()
 
-    if len(forklift_history) >= curr_fps * cfg.forklift_history_threshold:
+    if len(forklift_history) > curr_fps * cfg.forklift_history_threshold:
         forklift_history.clear()
     
-    if len(object_history) >= curr_fps * cfg.stone_history_threshold:
+    if len(object_history) > curr_fps * cfg.stone_history_threshold:
         object_history.clear()
 
     return object_already_present, object_history

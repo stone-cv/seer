@@ -455,7 +455,11 @@ async def check_for_motion(
             detected_item['saw_moving'] = in_motion
             logger.debug(f'Saw moving: {in_motion}')
 
-            if in_motion and not already_moving:
+            if already_moving == None:
+                already_moving = in_motion
+                logger.info(f'saw_already_moving set: {already_moving}')
+
+            elif in_motion and not already_moving:
                 # if not detect_occlusion(  # TODO verify against DEFINETLY not occluded bbox. reference size?
                 #     detected_bbox=xywh_history[-2],
                 #     reference_bbox=xywh_history[-1]
@@ -611,8 +615,9 @@ async def check_if_object_present(
 
                 # object_history.clear()
     
-    # region extra check
+    # region extra check if stone is present
     if (
+        object_already_present != None and
         not object_already_present and
         all(obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
     ):
@@ -634,6 +639,7 @@ async def check_if_object_present(
             await send_event_json(data=json)
     
     elif (
+        object_already_present != None and
         object_already_present and
         all(not obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
     ):

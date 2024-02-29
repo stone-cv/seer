@@ -15,14 +15,15 @@ from core.scenarios import process_video_file
 from core.utils import get_time_from_video_path
 
 
-app = FastAPI(title="Seer")
-api_router = APIRouter()
+# app = FastAPI(title="Seer")
+# api_router = APIRouter()
 
 
 class Application:
     def __init__(self):
         self.status: int = 0  # 0 - stopped, 1 - running
         self.__detector: ObjectDetection = ObjectDetection(capture_index=0)
+        self.__camera_id: int = cfg.camera_id
         self.__queue_search_video: asyncio.Queue = asyncio.Queue()
         self.__queue_download_video: asyncio.Queue = asyncio.Queue()
         self.__queue_process_video: asyncio.Queue = asyncio.Queue()
@@ -32,11 +33,11 @@ class Application:
         self.__task_generate: asyncio.Task = None
         self.__delay: int = cfg.delay * 60  # min to sec
         self.__deep_archive: int = cfg.deep_archive
-        self.__saw_already_moving: bool = False
+        self.__saw_already_moving: bool = None
         self.__stone_already_present: bool = None
         self.__stone_history: List[bool] = []
         # self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
-        self.__last_video_end: datetime = datetime(2024, 2, 27, 15, 40, 41)
+        self.__last_video_end: datetime = datetime(2024, 2, 28, 12, 29, 10)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -204,7 +205,7 @@ class Application:
                 self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
                     detector=self.__detector,
                     video_path=item,
-                    camera_id=1,  # default for now
+                    camera_id=self.__camera_id,
                     saw_already_moving = self.__saw_already_moving,
                     stone_already_present = self.__stone_already_present,
                     stone_history = self.__stone_history

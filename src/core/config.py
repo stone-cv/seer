@@ -37,6 +37,7 @@ json_auth_token = config['Application']['json_auth_token']
 cam_login = config['Camera_auth']['login']
 cam_password = config['Camera_auth']['password']
 recorder_ip = config['Camera_auth']['recorder_ip']
+camera_id = config['Camera_auth']['camera_id']
 channel = config['Camera_auth']['channel']
 
 # saw logic

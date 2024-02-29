@@ -64,12 +64,13 @@ async def main():
     await process_video_file(
         detector=detector,
         video_path=cfg.video_path,
+        saw_already_moving=None,
         stone_already_present=None,
-        camera_id=1  # default for now
+        camera_id=cfg.camera_id
     )
     # await process_live_video(
     #     detector=detector,
-    #     camera_id=1  # default for now
+    #     camera_id=cfg.camera_id
     # )
 
 

@@ -81,11 +81,11 @@ class Event(Base):
         )
 
         event_dict = {
-            'date': event.time.strftime("%Y-%m-%d %H:%M"),
-            'machine': "PW1TK 3000",
-            'operation': event_type.name,
-            'number': "Неизвестно",
-            'comment': "Тестовый документ"
+            "date": event.time.strftime('%Y-%m-%d %H:%M'),
+            "machine": "PW1TK 3000",
+            "operation": event_type.name,
+            "number": "0",
+            "comment": "Тестовый документ"
         }
         event_json = json.dumps(event_dict)
         return event_json

@@ -84,7 +84,7 @@ async def crop_images_in_folder(
     async with SessionLocal() as session:
         camera_roi = await Camera.get_roi_by_camera_id(
             db_session=session,
-            camera_id=1
+            camera_id=cfg.camera_id
         )
     roi_xmin = int(camera_roi[0][0])
     roi_ymin = int(camera_roi[0][1])
@@ -120,14 +120,11 @@ def get_time_from_video_path(
     start_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[1]))
     end_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[2].split('.')[0]))
 
-    # start_time = datetime.fromtimestamp(start_time_unix)
-    # end_time = datetime.fromtimestamp(end_time_unix)
-
     logger.debug(f'Video: {video_path}, start time: {start_time}, end time: {end_time}')
     return start_time, end_time
 
 
-def xml_helper(  # copied
+def xml_helper(
         start_time: datetime,
         end_time: datetime,
         track_id: int
@@ -159,22 +156,22 @@ def xml_helper(  # copied
 
 
 async def send_event_json(
-    data: dict,
+    data: str,
     url: str = cfg.json_url,
     auth: str = cfg.json_auth_token
 ) -> httpx.Response:
     headers = {
         "Content-Type": "application/json",
-        'Authorization': f'Bearer {auth}',
+        "Authorization": auth
     }
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url, headers=headers, json=data)
+            response = await client.post(url=url, headers=headers, content=data)
 
-            if response.status_code == 200 or response.status_code == 201:  # ?
-                logger.info(f'Request sent successfully. JSON: {data}')
+            if response.status_code == 200 or response.status_code == 201:
+                logger.info(f'JSON POST request sent successfully. Response: {response.text}')
             else:
-                logger.error(f'Response status code: {response.status_code}')
+                logger.error(f'JSON POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 
     except Exception as exc:
         logger.error(exc)
@@ -182,7 +179,7 @@ async def send_event_json(
     # return response
 
 
-def create_camera_roi(frame) -> list():  # doesn't work, implemented in "if __name__ == '__main__'"
+def create_camera_roi(frame) -> list():  # doesn't work here but implemented in "if __name__ == '__main__'"
     """
     Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
 
@@ -203,7 +200,6 @@ if __name__ == '__main__':
     roi_points = []
     frame = "../static/1.png"
 
-    # Load the image or video frame
     frame = cv2.imread(frame)
 
     def draw_roi(event, x, y, flags, param):
@@ -223,7 +219,6 @@ if __name__ == '__main__':
     cv2.namedWindow("Frame")
     cv2.setMouseCallback("Frame", draw_roi)
 
-    # Display the frame and wait for the ROI to be defined
     while True:
         cv2.imshow("Frame", frame)
         key = cv2.waitKey(1) & 0xFF

@@ -67,6 +67,8 @@ class Event(Base):
         db_session.add(event)
         await db_session.commit()
 
+        logger.debug(f'Event created: {event.__dict__}')
+
         return event
     
     @staticmethod

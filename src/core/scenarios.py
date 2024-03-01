@@ -129,11 +129,11 @@ async def process_video_file(
     except Exception as exc:
         logger.error(exc)
 
-    detector.save_detections_to_csv(
-        results_dict=all_results,
-        video_path=video_path,
-        video_fps=video_fps
-    )
+    # detector.save_detections_to_csv(
+    #     results_dict=all_results,
+    #     video_path=video_path,
+    #     video_fps=video_fps
+    # )
     cv2.destroyAllWindows()
 
     return (saw_already_moving, stone_already_present, stone_history)
@@ -446,7 +446,7 @@ async def check_for_motion(
             )
             saw_track_magn += magnitude
         else:
-            logger.info(f'Magnitude: {saw_track_magn}')
+            logger.debug(f'Magnitude: {saw_track_magn}')
             in_motion = is_moving(
                 magnitude=saw_track_magn,
                 threshold=cfg.saw_moving_threshold
@@ -470,7 +470,7 @@ async def check_for_motion(
                     camera_id=camera_id,
                     time=detection_time
                 )
-                logger.info(f'The saw started moving at {detection_time}, event created: {event.__dict__}')
+                logger.info(f'The saw started moving at {detection_time}, magnitude: {saw_track_magn}')
                 already_moving = True
 
                 if cfg.send_json:
@@ -487,7 +487,7 @@ async def check_for_motion(
                     camera_id=camera_id,
                     time=detection_time
                 )
-                logger.info(f'The saw stopped moving at {detection_time}, event created: {event.__dict__}')
+                logger.info(f'The saw stopped moving at {detection_time}, magnitude: {saw_track_magn}')
                 already_moving = False
 
                 if cfg.send_json:

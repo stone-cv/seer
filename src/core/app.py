@@ -37,7 +37,7 @@ class Application:
         self.__stone_already_present: bool = None
         self.__stone_history: List[bool] = []
         # self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
-        self.__last_video_end: datetime = datetime(2024, 2, 28, 12, 29, 10)
+        self.__last_video_end: datetime = datetime(2024, 2, 29, 14, 57, 41)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -159,6 +159,7 @@ class Application:
                 # check if we have already downloaded the file for this time period
                 for item in files_dict[cfg.channel]:  # redo
                     vid_start = datetime.strptime(item['startTime'], "%Y-%m-%dT%H:%M:%SZ")
+                    vid_end = datetime.strptime(item['endTime'], "%Y-%m-%dT%H:%M:%SZ")
                     if vid_start < self.__last_video_end:
                         if len(files_dict[cfg.channel]) > 1:
                             continue
@@ -168,7 +169,7 @@ class Application:
                             start_time=self.__last_video_end
                         )
                     else:
-                        logger.info(f"Successfully retrived file(s) from {start_time} to {end_time}")
+                        logger.info(f"Successfully retrived video (start: {vid_start}, end: {vid_end})")
                         await self.__queue_download_video.put(item)
 
             except Exception as exc:

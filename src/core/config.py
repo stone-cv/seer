@@ -28,6 +28,7 @@ required_fps = config['Application']['required_fps']
 weights_path = config['Application']['weights_path']
 deep_archive = config['Application']['deep_archive']
 delay = config['Application']['delay']
+# roi_check = config['Application']['roi_check']
 
 send_json = config['Application']['send_json']
 json_url = config['Application']['json_url']
@@ -43,6 +44,7 @@ channel = config['Camera_auth']['channel']
 # saw logic
 saw_moving_sec = config['Saw_logic']['saw_moving_sec']
 saw_moving_threshold = config['Saw_logic']['saw_moving_threshold']
+# angle_threshold = config['Saw_logic']['angle_threshold']
 
 # stone logic
 stone_history_threshold = config['Stone_logic']['stone_history_threshold']

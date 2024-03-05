@@ -94,7 +94,9 @@ class ObjectDetection:
         results = self.model(
             source=source,
             device=self.device,
-            conf=0.5
+            conf=0.3,
+            # save=True,
+            show=True
         )
         
         return results
@@ -122,6 +124,7 @@ class ObjectDetection:
             iou=0.5,
             device='mps',
             # tracker="bytetrack.yaml",
+            save=True,
             show=True
         )
 
@@ -139,14 +142,14 @@ class ObjectDetection:
                     conf = boxes.conf[0].astype(float)
                     xyxy = boxes.xyxy[0].tolist()
                     xywh = boxes.xywh[0].tolist()
-                    track_id = boxes.id[0].astype(int)
-                    logger.debug(f'class_id: {class_id}, track_id: {track_id}, conf: {conf}, xyxy: {xyxy}')
+                    # track_id = boxes.id[0].astype(int)
+                    logger.debug(f'class_id: {class_id}, track_id: {0}, conf: {conf}, xyxy: {xyxy}')
 
                     prediction = {
                         "class_id": int(class_id),
                         "class_name": self.CLASS_NAMES_DICT[class_id],
-                        # "track_id": 0,
-                        "track_id": int(track_id),
+                        "track_id": 0,
+                        # "track_id": int(track_id),
                         "conf": round(float(conf), 2),  # invalid format for json
                         "time": 0,
                         "xyxy": xyxy,
@@ -154,16 +157,16 @@ class ObjectDetection:
                         "saw_moving": None
                     }
                     frame_pred.append(prediction)
-                    # detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)  # for tracker
+                    detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)  # for tracker
 
                 else:
                     logger.info('No detections')
-                    # detections = np.empty((0, 5))  # for tracker
+                    detections = np.empty((0, 5))  # for tracker
 
         except Exception as e:
             logger.error(e)
         
-        return frame_pred  # detections
+        return frame_pred, detections
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):
@@ -195,36 +198,35 @@ class ObjectDetection:
             logger.error(e)
     
 
-    def plot_bboxes(self, results, frame):
+    def plot_bboxes(self, xyxy, conf, class_id, tracker_id, frame):
         
-        xyxys = []
-        confidences = []
-        class_ids = []
+        # xyxys = []
+        # confidences = []
+        # class_ids = []
         
-         # Extract detections for person class
-        for result in results:
-            boxes = result.boxes.cpu().numpy()
-            class_id = boxes.cls[0]
-            conf = boxes.conf[0]
-            xyxy = boxes.xyxy[0]
+        #  # Extract detections for person class
+        # for result in results:
+        #     boxes = result.boxes.cpu().numpy()
+        #     class_id = boxes.cls[0]
+        #     conf = boxes.conf[0]
+        #     xyxy = boxes.xyxy[0]
 
-            if class_id == 0.0:
-              xyxys.append(result.boxes.xyxy.cpu().numpy())
-              confidences.append(result.boxes.conf.cpu().numpy())
-              class_ids.append(result.boxes.cls.cpu().numpy().astype(int))
-            
-        
+        #     # if class_id == 0.0:
+        #     xyxys.append(result.boxes.xyxy.cpu().numpy())
+        #     confidences.append(result.boxes.conf.cpu().numpy())
+        #     class_ids.append(result.boxes.cls.cpu().numpy().astype(int))
+
         # Setup detections for visualization
         detections = sv.Detections(
-                    xyxy=results[0].boxes.xyxy.cpu().numpy(),
-                    confidence=results[0].boxes.conf.cpu().numpy(),
-                    class_id=results[0].boxes.cls.cpu().numpy().astype(int),
+                    xyxy=np.array([xyxy]),
+                    confidence=np.array([conf]),
+                    class_id=np.array([class_id]),
+                    tracker_id=np.array([tracker_id])
                     )
-        
-    
+
         # Format custom labels
         self.labels = [f"{self.CLASS_NAMES_DICT[class_id]} {confidence:0.2f}"
-        for _, confidence, class_id, tracker_id
+        for _, _, confidence, class_id, tracker_id, _
         in detections]
         
         # Annotate and display frame

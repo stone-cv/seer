@@ -1,3 +1,4 @@
+import os
 import cv2
 import numpy as np
 
@@ -9,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import core.config as cfg
 from core.logger import logger
-# from tracker.tracker import Sort
+from tracker.tracker import Sort
+# from tracker.tracker_dpsort import Tracker
 from detector.detector import ObjectDetection
 from core.models import Event
 from core.models import Camera
@@ -31,7 +33,7 @@ async def process_video_file(
     """
     ???
     """
-    # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
+    tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
     # tracker = Tracker()
 
     vid_start_time, _ = get_time_from_video_path(video_path)
@@ -64,35 +66,70 @@ async def process_video_file(
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
                 logger.debug(f'Detection time: {detection_time}')
 
-                results = detector.track_custom(source=frame)
-                # results = detector.predict_custom(source=frame)
+                # results = detector.track_custom(source=frame)
+                results = detector.predict_custom(source=frame)
 
                 for result in results:
-                    frame_pred = detector.parse_detections(result)  # _ / detections for an outside tracker
+                    # frame_pred, detections = detector.parse_detections(result)  # _ / detections for an outside tracker
+                    detections = []
+                    for r in result.boxes.data.tolist():
+                        x1, y1, x2, y2, score, class_id = r
+                        x1 = int(x1)
+                        x2 = int(x2)
+                        y1 = int(y1)
+                        y2 = int(y2)
+                        class_id = int(class_id)
+                        detections.append([x1, y1, x2, y2, score])
 
-                    for item in frame_pred:
-                        item['time'] = detection_time
+                    # deep_sort
+                    tracker.update(frame, detections)
+                    for track in tracker.tracks:
+                        track_id = track.track_id
+                        track_bbox = track.bbox
+                        logger.debug(track.__dict__)
+                    
+                    # sort
+                    track_bbs_ids = tracker.update(detections)
+                    if track_bbs_ids.size != 0:
+                        track_id = int(track_bbs_ids[0][-1])
+
+
+                    # for item in frame_pred:
+                    #     item['time'] = detection_time
 
                         # ROI check
                         item_in_roi = await is_in_roi(
                             roi_xyxy=camera_roi,
-                            object_xyxy=item['xyxy']
+                            # object_xyxy=item['xyxy']
+                            object_xyxy=track_bbox
                         )
                         if item_in_roi:
-                            class_ids.append(item['class_id'])
+                            # class_ids.append(item['class_id'])
+                            class_ids.append(class_id)
 
                             # saw motion logic
-                            if item['class_id'] == 1:  # saw class id
+                            # if item['class_id'] == 1:  # saw class id
+                            if class_id == 1:  # saw class id
                                 saw_track_magn, saw_already_moving = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
-                                    detected_item=item,
+                                    # detected_item=item,
+                                    track_bbox=track_bbox,
                                     saw_track_magn=saw_track_magn,
                                     already_moving=saw_already_moving,
                                     curr_fps=curr_fps,
                                     detection_time=detection_time,
                                     camera_id=camera_id
                                 )
+
+                        # plotted_frame = detector.plot_bboxes(
+                        #     frame=frame,
+                        #     xyxy=track_bbox,
+                        #     conf=score,
+                        #     class_id=class_id,
+                        #     tracker_id=track_id
+                        # )
+                        # cv2.imshow('Detection', plotted_frame)
 
                     # stone logic
                     stone_already_present, stone_history = await check_if_object_present(
@@ -108,22 +145,8 @@ async def process_video_file(
                         camera_id=camera_id
                     )
 
-                    # update tracker
-
-                    # sort
-                    # track_bbs_ids = tracker.update(detections)
-                    # if track_bbs_ids.size != 0:
-                        # track_id = int(track_bbs_ids[0][-1])
-    
-                    # deep_sort
-                    # tracker.update(frame, detections)
-                    # for track in tracker.tracks:
-                    #     track_id = track.track_id
-                    #     item["track_id"] = track_id
-                    #     logger.debug(f'Track ID: {track_id}')
-
-                logger.debug(f'results: {frame_pred}')
-                all_results[frame_idx] = frame_pred
+                # logger.debug(f'results: {frame_pred}')
+                # all_results[frame_idx] = frame_pred
 
     # except StopIteration:
     except Exception as exc:
@@ -355,58 +378,20 @@ def is_moving(
     return in_motion
 
 
-def convert_xywh_to_xyxy(bbox_xywh):
-    x, y, w, h = bbox_xywh
-    x1 = x
-    y1 = y
-    x2 = x + w
-    y2 = y + h
-    return [x1, y1, x2, y2]
-
-def calculate_iou(box1, box2):
-    # Calculate the intersection area
-    x1 = max(box1[0], box2[0])
-    y1 = max(box1[1], box2[1])
-    x2 = min(box1[2], box2[2])
-    y2 = min(box1[3], box2[3])
-
-    intersection_area = max(0, x2 - x1) * max(0, y2 - y1)
-
-    # Calculate the union area
-    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
-    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-    union_area = area_box1 + area_box2 - intersection_area
-
-    # Calculate IoU
-    iou = intersection_area / union_area
-    return iou
-
-def detect_occlusion(detected_bbox, reference_bbox, size_threshold=0.7, iou_threshold=0.5):
-    # Convert xywh format to xyxy format
-    detected_bbox_xyxy = convert_xywh_to_xyxy(detected_bbox)
-    reference_bbox_xyxy = convert_xywh_to_xyxy(reference_bbox)
-
-    # Calculate the areas of the detected and reference bounding boxes
-    area_detected = detected_bbox[2] * detected_bbox[3]
-    area_reference = reference_bbox[2] * reference_bbox[3]
-
-    # Compare the sizes of the bounding boxes
-    size_difference = area_detected / area_reference
-
-    # Calculate IoU between the two bounding boxes
-    iou = calculate_iou(detected_bbox_xyxy, reference_bbox_xyxy)
-
-    # Check for occlusion based on size difference and IoU threshold
-    if size_difference < size_threshold and iou > iou_threshold:
-        return True
-    else:
-        return False
+def convert_xyxy_to_xywh(bbox_xyxy):
+    x_min, y_min, x_max, y_max = bbox_xyxy
+    width = x_max - x_min
+    height = y_max - y_min
+    x = x_min
+    y = y_min
+    return (x, y, width, height)
 
 
 async def check_for_motion(
         db_session: AsyncSession,
         xywh_history: List[List[float]],
-        detected_item: dict,
+        # detected_item: dict,
+        track_bbox: List[float],
         saw_track_magn: float,
         already_moving: bool,
         # last_motion: bool,  # TODO check for short motion
@@ -436,7 +421,8 @@ async def check_for_motion(
         saw_track_magn (float): обновленная величина смещения bbox'а
         already_moving (bool): обновленное значение
     """
-    xywh_history.append(detected_item['xywh'])
+    bbox_xywh = convert_xyxy_to_xywh(track_bbox)
+    xywh_history.append(bbox_xywh)
 
     if len(xywh_history) > 1:
         if len(xywh_history) < curr_fps * cfg.saw_moving_sec:
@@ -452,7 +438,7 @@ async def check_for_motion(
                 threshold=cfg.saw_moving_threshold
             )
 
-            detected_item['saw_moving'] = in_motion
+            # detected_item['saw_moving'] = in_motion
             logger.debug(f'Saw moving: {in_motion}')
 
             if already_moving == None:

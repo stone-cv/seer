@@ -37,7 +37,7 @@ class Application:
         self.__stone_already_present: bool = None
         self.__stone_history: List[bool] = []
         # self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
-        self.__last_video_end: datetime = datetime(2024, 2, 29, 14, 57, 41)
+        self.__last_video_end: datetime = datetime(2024, 3, 5, 8, 19, 41)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -169,7 +169,7 @@ class Application:
                             start_time=self.__last_video_end
                         )
                     else:
-                        logger.info(f"Successfully retrived video (start: {vid_start}, end: {vid_end})")
+                        logger.info(f"Successfully retrived video file (start: {vid_start}, end: {vid_end})")
                         await self.__queue_download_video.put(item)
 
             except Exception as exc:

@@ -103,11 +103,11 @@ class ObjectDetection:
     def predict_vid_showcase(self, video_path):
 
         results = self.model.predict(
-        source=video_path,
-        show=True,
-        save=True,
-        save_txt=True,
-        device="mps",
+            source=video_path,
+            show=True,
+            save=True,
+            save_txt=True,
+            device="mps",
         )
         
         return results

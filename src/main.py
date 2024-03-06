@@ -9,7 +9,6 @@ from detector.detector import ObjectDetection
 from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
-from core.scenarios import process_live_video
 from core.utils import crop_images_in_folder
 from core.models import *
 from core.app import Application
@@ -65,7 +64,7 @@ async def main():
         detector=detector,
         video_path=cfg.video_path,
         saw_already_moving=None,
-        stone_already_present=None,
+        stone_already_present=True,
         camera_id=cfg.camera_id
     )
     # await process_live_video(

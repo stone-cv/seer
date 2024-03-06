@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import core.config as cfg
 from core.logger import logger
 from tracker.tracker import Sort
-# from tracker.tracker_dpsort import Tracker
+from tracker.tracker_dpsort import Tracker
 from detector.detector import ObjectDetection
 from core.models import Event
 from core.models import Camera
@@ -26,18 +26,17 @@ async def process_video_file(
     detector: ObjectDetection,
     video_path: str,
     camera_id: int,
-    saw_already_moving: bool = False,
-    stone_already_present: bool = False,
+    saw_already_moving: bool = None,
+    stone_already_present: bool = None,
     stone_history: List[bool] = []
 ) -> tuple:
     """
     ???
     """
-    tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-    # tracker = Tracker()
+    tracker_sort = Sort(max_age=50, min_hits=10)  # iou_threshold=0.5  # sort
+    tracker_dsort = Tracker()  # deep_sort
 
     vid_start_time, _ = get_time_from_video_path(video_path)
-    all_results = {}
 
     # variables for saw logic
     saw_xywh_history = []
@@ -66,54 +65,51 @@ async def process_video_file(
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
                 logger.debug(f'Detection time: {detection_time}')
 
-                # results = detector.track_custom(source=frame)
                 results = detector.predict_custom(source=frame)
-
                 for result in results:
-                    # frame_pred, detections = detector.parse_detections(result)  # _ / detections for an outside tracker
-                    detections = []
-                    for r in result.boxes.data.tolist():
-                        x1, y1, x2, y2, score, class_id = r
-                        x1 = int(x1)
-                        x2 = int(x2)
-                        y1 = int(y1)
-                        y2 = int(y2)
-                        class_id = int(class_id)
-                        detections.append([x1, y1, x2, y2, score])
+                    detections = detector.parse_detections(result)
 
                     # deep_sort
-                    tracker.update(frame, detections)
-                    for track in tracker.tracks:
-                        track_id = track.track_id
-                        track_bbox = track.bbox
-                        logger.debug(track.__dict__)
-                    
+                    # tracker_dsort.update(frame, detections)
+                    # for track in tracker.tracks:
+                    #     logger.info(track.__dict__)
+                    #     track_id = track.track_id
+                    #     track_bbox = track.bbox
+                    #     x1, y1, x2, y2 = track_bbox
+                
                     # sort
-                    track_bbs_ids = tracker.update(detections)
-                    if track_bbs_ids.size != 0:
-                        track_id = int(track_bbs_ids[0][-1])
+                    tracked_obj = tracker_sort.update(detections)
 
+                    for obj in tracked_obj:
+                        track_id = int(obj[-2])
+                        track_bbox = obj[:4]
+                        class_id = int(obj[-1])
+                        logger.debug(f'track_id: {track_id}, track_bbox: {track_bbox}, class_id: {class_id}')
 
-                    # for item in frame_pred:
-                    #     item['time'] = detection_time
+                        # show frame
+                        plotted_frame = detector.plot_bboxes(
+                            frame=frame,
+                            xyxy=track_bbox,
+                            # conf=score,
+                            class_id=class_id,
+                            tracker_id=track_id,
+                            roi_coords=camera_roi
+                        )
+                        cv2.imshow('Detection', plotted_frame)
 
                         # ROI check
                         item_in_roi = await is_in_roi(
                             roi_xyxy=camera_roi,
-                            # object_xyxy=item['xyxy']
                             object_xyxy=track_bbox
                         )
                         if item_in_roi:
-                            # class_ids.append(item['class_id'])
                             class_ids.append(class_id)
 
                             # saw motion logic
-                            # if item['class_id'] == 1:  # saw class id
                             if class_id == 1:  # saw class id
                                 saw_track_magn, saw_already_moving = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
-                                    # detected_item=item,
                                     track_bbox=track_bbox,
                                     saw_track_magn=saw_track_magn,
                                     already_moving=saw_already_moving,
@@ -121,15 +117,6 @@ async def process_video_file(
                                     detection_time=detection_time,
                                     camera_id=camera_id
                                 )
-
-                        # plotted_frame = detector.plot_bboxes(
-                        #     frame=frame,
-                        #     xyxy=track_bbox,
-                        #     conf=score,
-                        #     class_id=class_id,
-                        #     tracker_id=track_id
-                        # )
-                        # cv2.imshow('Detection', plotted_frame)
 
                     # stone logic
                     stone_already_present, stone_history = await check_if_object_present(
@@ -145,140 +132,13 @@ async def process_video_file(
                         camera_id=camera_id
                     )
 
-                # logger.debug(f'results: {frame_pred}')
-                # all_results[frame_idx] = frame_pred
-
     # except StopIteration:
     except Exception as exc:
         logger.error(exc)
 
-    # detector.save_detections_to_csv(
-    #     results_dict=all_results,
-    #     video_path=video_path,
-    #     video_fps=video_fps
-    # )
     cv2.destroyAllWindows()
 
     return (saw_already_moving, stone_already_present, stone_history)
-
-
-async def process_live_video(
-    detector: ObjectDetection,
-    camera_id: int,
-    fps: int = cfg.required_fps
-) -> None:
-    """
-    ???
-    """
-    # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-    # tracker = Tracker()
-
-    start_time = datetime.now()
-    frame_idx = 1
-
-    # variables for saw logic
-    saw_xywh_history = []
-    saw_track_magn = 0
-    already_moving = False
-
-    # variables for stone logic
-    class_ids = []
-    stone_history = []
-    stone_already_present = False
-
-    try:
-        async with SessionLocal() as session:
-            camera_roi = await Camera.get_roi_by_camera_id(  # just get camera object?
-                db_session=session,
-                camera_id=camera_id
-            )
-            camera_url = await Camera.get_url_by_camera_id(
-                db_session=session,
-                camera_id=camera_id
-            )
-            camera_url = f'{camera_url}/ISAPI/Streaming/channels/201'  # 201 harcoded
-
-            video_stream = cv2.VideoCapture(camera_url)
-            video_fps = video_stream.get(cv2.CAP_PROP_FPS)
-            frame_interval = int(video_fps / fps)
-
-            while True:
-                ret, frame = video_stream.read()
-                if not ret:
-                    break
-
-                if frame_idx % frame_interval == 0:
-                    roi_xmin = int(camera_roi[0][0])
-                    roi_ymin = int(camera_roi[0][1])
-                    roi_xmax = int(camera_roi[1][0])
-                    roi_ymax = int(camera_roi[1][1])
-                    cropped_frame = frame[roi_ymin:roi_ymax, roi_xmin:roi_xmax]
-
-                    detection_time = datetime.now()
-                    calculated_time = start_time + timedelta(seconds=frame_idx/video_fps)
-                    logger.debug(f'Detection time: {detection_time}, calculated time: {calculated_time}')
-
-                    results = detector.track_custom(source=cropped_frame)
-                    # results = detector.predict_custom(source=frame)
-
-                    for result in results:
-                        frame_pred = detector.parse_detections(result)  # detections for an outside tracker
-
-                        for item in frame_pred:
-                            item['time'] = detection_time
-
-                            # ROI check
-                            item_in_roi = await is_in_roi(
-                                roi_xyxy=camera_roi,
-                                object_xyxy=item['xyxy']
-                            )
-                            if item_in_roi:
-                                class_ids.append(item['class_id'])
-
-                                # saw motion logic
-                                if item['class_id'] == 1:  # saw class id
-                                    saw_track_magn, already_moving = await check_for_motion(
-                                        db_session=session,
-                                        xywh_history=saw_xywh_history,
-                                        detected_item=item,
-                                        saw_track_magn=saw_track_magn,
-                                        already_moving=already_moving,
-                                        curr_fps=video_fps,
-                                        detection_time=detection_time
-                                    )
-
-                        # stone logic
-                        stone_already_present = await check_if_object_present(
-                            db_session=session,
-                            stone_id=0,  # stone class id
-                            detected_class_ids=class_ids,
-                            object_history=stone_history,
-                            object_already_present=stone_already_present,
-                            curr_fps=video_fps,
-                            detection_time=detection_time
-                        )
-
-                        # update tracker
-
-                        # sort
-                        # track_bbs_ids = tracker.update(detections)
-                        # if track_bbs_ids.size != 0:
-                        # track_id = int(track_bbs_ids[0][-1])
-
-                        # deep_sort
-                        # tracker.update(frame, detections)
-                        # for track in tracker.tracks:
-                        #     track_id = track.track_id
-                        #     item["track_id"] = track_id
-                        #     logger.debug(f'Track ID: {track_id}')
-
-                    logger.debug(f'results: {frame_pred}')
-
-                frame_idx += 1
-                logger.debug(f'Frame index: {frame_idx}')
-
-    except Exception as exc:
-        logger.error(exc)
 
 
 async def is_in_roi(
@@ -547,6 +407,7 @@ async def check_if_object_present(
 
             if (
                 forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
+                object_already_present != None and
                 not object_already_present and
                 object_history.count(False) > len(object_history) * cfg.majority_threshold and
                 all(obj_present_result for obj_present_result in object_history[-(curr_fps * cfg.stone_change_threshold):])

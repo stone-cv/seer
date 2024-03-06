@@ -131,42 +131,52 @@ class ObjectDetection:
         return results
     
 
-    def parse_detections(self, results):
+    def parse_detections(self, result):
         try:
-            frame_pred = []
-            for result in results:
-                boxes = result.boxes.cpu().numpy()
+            detections = []
+            for r in result.boxes.data.tolist():
+                x1, y1, x2, y2, score, class_id = r
+                x1 = int(x1)
+                x2 = int(x2)
+                y1 = int(y1)
+                y2 = int(y2)
+                class_id = int(class_id)
+                detections.append([x1, y1, x2, y2, score, class_id])
+    
+            # for result in results:
+            #     boxes = result.boxes.cpu().numpy()
 
-                if boxes.cls.size > 0:  # and boxes.cls.any()
-                    class_id = boxes.cls[0].astype(int)
-                    conf = boxes.conf[0].astype(float)
-                    xyxy = boxes.xyxy[0].tolist()
-                    xywh = boxes.xywh[0].tolist()
-                    # track_id = boxes.id[0].astype(int)
-                    logger.debug(f'class_id: {class_id}, track_id: {0}, conf: {conf}, xyxy: {xyxy}')
+                # if boxes.cls.size > 0:  # and boxes.cls.any()
+            #         class_id = boxes.cls[0].astype(int)
+            #         conf = boxes.conf[0].astype(float)
+            #         xyxy = boxes.xyxy[0].tolist()
+            #         xywh = boxes.xywh[0].tolist()
+            #         # track_id = boxes.id[0].astype(int)
+            #         logger.debug(f'class_id: {class_id}, track_id: {0}, conf: {conf}, xyxy: {xyxy}')
 
-                    prediction = {
-                        "class_id": int(class_id),
-                        "class_name": self.CLASS_NAMES_DICT[class_id],
-                        "track_id": 0,
-                        # "track_id": int(track_id),
-                        "conf": round(float(conf), 2),  # invalid format for json
-                        "time": 0,
-                        "xyxy": xyxy,
-                        "xywh": xywh,
-                        "saw_moving": None
-                    }
-                    frame_pred.append(prediction)
-                    detections = (np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf])).reshape(-1, 5)  # for tracker
+            #         prediction = {
+            #             "class_id": int(class_id),
+            #             "class_name": self.CLASS_NAMES_DICT[class_id],
+            #             "track_id": 0,
+            #             # "track_id": int(track_id),
+            #             "conf": round(float(conf), 2),  # invalid format for json
+            #             "time": 0,
+            #             "xyxy": xyxy,
+            #             "xywh": xywh,
+            #             "saw_moving": None
+            #         }
+            #         # frame_pred.append(prediction)
+                # detections.append(np.array([xyxy[0], xyxy[1], xyxy[2], xyxy[3], conf]).reshape(-1, 5))  # for tracker
+                # detections.append([x1, y1, x2, y2, score])
 
-                else:
-                    logger.info('No detections')
-                    detections = np.empty((0, 5))  # for tracker
+                # else:
+                #     logger.info('No detections')
+                #     detections.append(np.empty((0, 5)))  # for tracker
 
         except Exception as e:
             logger.error(e)
         
-        return frame_pred, detections
+        return np.array(detections)
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):
@@ -198,7 +208,7 @@ class ObjectDetection:
             logger.error(e)
     
 
-    def plot_bboxes(self, xyxy, conf, class_id, tracker_id, frame):
+    def plot_bboxes(self, xyxy, class_id, tracker_id, frame, roi_coords):
         
         # xyxys = []
         # confidences = []
@@ -219,19 +229,20 @@ class ObjectDetection:
         # Setup detections for visualization
         detections = sv.Detections(
                     xyxy=np.array([xyxy]),
-                    confidence=np.array([conf]),
+                    # confidence=np.array([conf]),
                     class_id=np.array([class_id]),
                     tracker_id=np.array([tracker_id])
                     )
 
         # Format custom labels
-        self.labels = [f"{self.CLASS_NAMES_DICT[class_id]} {confidence:0.2f}"
-        for _, _, confidence, class_id, tracker_id, _
+        self.labels = [f"{self.CLASS_NAMES_DICT[class_id]} ID {tracker_id}"
+        for _, _, _, class_id, tracker_id, _
         in detections]
         
         # Annotate and display frame
         frame = self.box_annotator.annotate(scene=frame, detections=detections, labels=self.labels)
-        
+        cv2.rectangle(frame, (int(roi_coords[0][0]), int(roi_coords[0][1])), (int(roi_coords[1][0]), int(roi_coords[1][1])), (0, 255, 0), 2)
+
         return frame
     
     

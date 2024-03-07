@@ -21,7 +21,6 @@ from core.utils import send_event_json
 from core.utils import get_time_from_video_path
 
 
-# combine process file & live in one method
 async def process_video_file(
     detector: ObjectDetection,
     video_path: str,
@@ -33,7 +32,7 @@ async def process_video_file(
     """
     ???
     """
-    tracker_sort = Sort(max_age=50, min_hits=10)  # iou_threshold=0.5  # sort
+    tracker_sort = Sort(max_age=30, min_hits=7)  # iou_threshold=0.5  # sort
     tracker_dsort = Tracker()  # deep_sort
 
     vid_start_time, _ = get_time_from_video_path(video_path)

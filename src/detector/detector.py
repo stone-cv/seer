@@ -18,7 +18,7 @@ from core.logger import logger
 
 class ObjectDetection:
 
-    def __init__(self, capture_index):
+    def __init__(self, capture_index, mode: str):
        
         self.capture_index = capture_index
         
@@ -26,17 +26,21 @@ class ObjectDetection:
         self.device = 'mps'
         print("Using Device: ", self.device)
         
-        self.model = self.load_model()
+        self.model = self.load_model(mode)
         
         self.CLASS_NAMES_DICT = self.model.model.names
     
         self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
     
 
-    def load_model(self):
+    def load_model(self, mode: str):
        
         # model = YOLO("yolov8l.pt")  # load a pretrained YOLOv8n model
-        model = YOLO(cfg.weights_path)
+        if mode == 'det':
+            model = YOLO(cfg.weights_det)
+        if mode == 'seg':
+            model = YOLO(cfg.weights_seg)
+
         model.fuse()
     
         return model
@@ -94,20 +98,8 @@ class ObjectDetection:
         results = self.model(
             source=source,
             device=self.device,
-            conf=0.5
-        )
-        
-        return results
-    
-
-    def predict_vid_showcase(self, video_path):
-
-        results = self.model.predict(
-            source=video_path,
-            show=True,
+            conf=0.5,
             save=True,
-            save_txt=True,
-            device="mps",
         )
         
         return results

@@ -28,7 +28,8 @@ async def main():
     # except KeyboardInterrupt:
     #     app.stop()
 
-    detector = ObjectDetection(capture_index=0)  # here? source?
+    detector = ObjectDetection(capture_index=0, mode='det')
+    seg_detector = ObjectDetection(capture_index=0, mode='seg')
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -61,13 +62,16 @@ async def main():
     """ process video & detect objects """
     # logger.info('Detection started')
 
-    await process_video_file(
-        detector=detector,
-        video_path=cfg.video_path,
-        saw_already_moving=None,
-        stone_already_present=None,
-        camera_id=cfg.camera_id
-    )
+    seg_detector.predict_custom('static/1.png')
+
+    # await process_video_file(
+    #     detector=detector,
+    #     seg_detector=seg_detector,
+    #     video_path=cfg.video_path,
+    #     saw_already_moving=None,
+    #     stone_already_present=None,
+    #     camera_id=cfg.camera_id
+    # )
     # await process_live_video(
     #     detector=detector,
     #     camera_id=cfg.camera_id

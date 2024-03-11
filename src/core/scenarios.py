@@ -21,6 +21,7 @@ from core.utils import get_time_from_video_path
 # combine process file & live in one method
 async def process_video_file(
     detector: ObjectDetection,
+    seg_detector: ObjectDetection,
     video_path: str,
     camera_id: int,
     saw_already_moving: bool = False,
@@ -89,6 +90,11 @@ async def process_video_file(
                                     detection_time=detection_time,
                                     camera_id=camera_id
                                 )
+                            
+                            # test segmentation
+                            # if item['class_id'] == 0:  # stone class id
+                            #     seg_results = seg_detector.predict_custom(source=frame)
+                                # logger.info(seg_results)
 
                     # stone logic
                     stone_already_present, stone_history = await check_if_object_present(

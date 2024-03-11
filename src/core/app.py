@@ -22,7 +22,8 @@ from core.utils import get_time_from_video_path
 class Application:
     def __init__(self):
         self.status: int = 0  # 0 - stopped, 1 - running
-        self.__detector: ObjectDetection = ObjectDetection(capture_index=0)
+        self.__detector: ObjectDetection = ObjectDetection(capture_index=0, mode='det')
+        self.__detector_seg: ObjectDetection = ObjectDetection(capture_index=0, mode='seg')
         self.__camera_id: int = cfg.camera_id
         self.__queue_search_video: asyncio.Queue = asyncio.Queue()
         self.__queue_download_video: asyncio.Queue = asyncio.Queue()
@@ -205,6 +206,7 @@ class Application:
             try:
                 self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
                     detector=self.__detector,
+                    seg_detector=self.__detector_seg,
                     video_path=item,
                     camera_id=self.__camera_id,
                     saw_already_moving = self.__saw_already_moving,

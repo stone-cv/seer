@@ -9,7 +9,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 import core.config as cfg
 from core.logger import logger
-# from tracker.tracker import Sort
 from detector.detector import ObjectDetection
 from core.models import Event
 from core.models import Camera
@@ -31,8 +30,6 @@ async def process_video_file(
     """
     ???
     """
-    # tracker = Sort(max_age=20, min_hits=3, iou_threshold=0.3)
-    # tracker = Tracker()
 
     vid_start_time, _ = get_time_from_video_path(video_path)
     all_results = {}
@@ -65,7 +62,6 @@ async def process_video_file(
                 logger.debug(f'Detection time: {detection_time}')
 
                 results = detector.track_custom(source=frame)
-                # results = detector.predict_custom(source=frame)
 
                 for result in results:
                     frame_pred = detector.parse_detections(result)  # _ / detections for an outside tracker
@@ -108,20 +104,6 @@ async def process_video_file(
                         camera_id=camera_id
                     )
 
-                    # update tracker
-
-                    # sort
-                    # track_bbs_ids = tracker.update(detections)
-                    # if track_bbs_ids.size != 0:
-                        # track_id = int(track_bbs_ids[0][-1])
-    
-                    # deep_sort
-                    # tracker.update(frame, detections)
-                    # for track in tracker.tracks:
-                    #     track_id = track.track_id
-                    #     item["track_id"] = track_id
-                    #     logger.debug(f'Track ID: {track_id}')
-
                 logger.debug(f'results: {frame_pred}')
                 all_results[frame_idx] = frame_pred
 
@@ -129,11 +111,6 @@ async def process_video_file(
     except Exception as exc:
         logger.error(exc)
 
-    # detector.save_detections_to_csv(
-    #     results_dict=all_results,
-    #     video_path=video_path,
-    #     video_fps=video_fps
-    # )
     cv2.destroyAllWindows()
 
     return (saw_already_moving, stone_already_present, stone_history)

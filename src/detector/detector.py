@@ -98,9 +98,9 @@ class ObjectDetection:
         results = self.model(
             source=source,
             device=self.device,
-            conf=0.5,
-            stream=True,
-            show=True
+            conf=0.3,
+            # stream=True,
+            # show=True
         )
         
         return results
@@ -115,7 +115,8 @@ class ObjectDetection:
             iou=0.5,
             device='mps',
             # tracker="bytetrack.yaml",
-            show=True
+            # stream=True,
+            # show=True
         )
 
         return results

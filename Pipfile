@@ -20,7 +20,7 @@ matplotlib = "==3.8.2"
 mpmath = "==1.3.0"
 networkx = "==3.2.1"
 numpy = "*"
-opencv-python = ">=4.1.2"
+opencv-python = ">=4.1.2.30"
 packaging = "==23.2"
 pandas = "*"
 pillow = "*"
@@ -61,6 +61,7 @@ psycopg2 = "*"
 httpx = "*"
 lxml = "*"
 aiofiles = "*"
+lapx = "*"
 
 [dev-packages]
 

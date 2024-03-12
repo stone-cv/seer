@@ -116,7 +116,7 @@ class ObjectDetection:
             device='mps',
             # tracker="bytetrack.yaml",
             # stream=True,
-            # show=True
+            show=True
         )
 
         return results

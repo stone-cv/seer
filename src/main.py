@@ -6,6 +6,7 @@ import random
 import cv2
 import numpy as np
 from PIL import Image, ImageDraw
+from ultralytics import YOLO
 
 import core.config as cfg
 from core.logger import logger
@@ -51,69 +52,65 @@ async def main():
     # )
     # logger.info(f'Training complete')
 
-    """ download files """
-    # files_dict = await get_files_list(
-    #     channel=cfg.channel,
-    #     recorder_ip=cfg.recorder_ip,
-    #     start_time=datetime.datetime.fromisoformat("2024-02-14T11:00:00Z".replace("Z", "+03:00")),  # Moscow timezone ?
-    #     end_time=datetime.datetime.fromisoformat("2024-02-14T11:59:59Z".replace("Z", "+03:00"))  # Moscow timezone ?
-    # )
-    # await download_files(
-    #     channel=cfg.channel,
-    #     recorder_ip=cfg.recorder_ip,
-    #     files_dict=files_dict,
-    #     queue=queue
-    # )
-
     """ process video & detect objects """
     # logger.info('Detection started')
 
     # img = cv2.imread('static/vlcsnap-2024-02-12-12h34m02s185.png')
-    # results = seg_detector.predict_custom(img)
+    img = cv2.imread('static/1.png')
 
-    # yolo_classes = list(seg_detector.CLASS_NAMES_DICT)
+    # results = seg_detector.model(
+    #     # 'static/test-start-sawing-short_1702639705_1702639796.mp4',
+    #     'static/1.png',
+    #     # stream=True, 
+    #     show=True
+    # )
+    results = seg_detector.model(img)
+
+    # yolo_classes = list(seg_detector.model.names.values())  # seg_detector.CLASS_NAMES_DICT
     # classes_ids = [yolo_classes.index(clas) for clas in yolo_classes]
 
     # colors = [random.choices(range(256), k=3) for _ in classes_ids]
     # logger.info(f'Results: {results}')
-    # for result in results:
-    #     for mask, box in zip(result.masks.xy, result.boxes):
-    #         points = np.int32([mask])
-    #         logger.info(f'Points: {points}')
-    #         # cv2.polylines(img, points, True, (255, 0, 0), 1)
+    for result in results:
+        # for mask, box in zip(result.masks.xy, result.boxes):
+        for mask in result.masks.xy:
+            logger.debug(f'Mask coords: {mask}')
+
+            # calculate area
+            ratio_px_to_cm = 1.2  # 0.8 recalculate
+
+            # contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+            
+            area_px = cv2.contourArea(mask)
+            logger.info(f'Contour area: {area_px} px')
+            area_cm2 = round(area_px / (ratio_px_to_cm ** 2))
+            logger.info(f'Slab area: {area_cm2} cm^2')
+
+            cv2.polylines(img, np.int32([mask]), True, (255, 0, 0), 1)
+            cv2.imshow("Image", img)
+            cv2.waitKey(0)
+
     #         color_number = classes_ids.index(int(box.cls[0]))
-    #         # cv2.fillPoly(img, points, colors[color_number])  # pizda
+
+    #         # cv2.fillPoly(img, points, colors[color_number])  # crashes
+    #         # Create a mask image
+    #         mask_img = np.zeros_like(img)
+    #         cv2.drawContours(mask_img, [points], 0, colors[color_number], -1)
+
+    #         # Apply the mask to the original image
+    #         img = cv2.addWeighted(img, 1, mask_img, 0.5, 0)
 
     # cv2.imshow("Image", img)
     # cv2.waitKey(0)
-    # cv2.imwrite('static/vlcsnap-2024-02-12-12h34m02s185_mask.png', img)
-
-    # for r in results:
-    #     masks = r.masks.cpu().numpy()
-    #     logger.info(masks.__dict__)
-    #     for mask in masks:
-    #         mask_obj = mask.data[0]
-    #         polygon = mask.xy[0].tolist()
-    #         logger.info(polygon)
-
-    #         # mask_img = Image.fromarray(mask,"I")
-
-    #         img = Image.open('static/vlcsnap-2024-02-12-12h34m02s185.png')
-    #         draw = ImageDraw.Draw(img)
-    #         draw.polygon(polygon,outline=(0,255,0), width=5)
-    #         img.save('static/1_mask.png')
+    # cv2.imwrite('static/1_mask.png', img)
 
 
-    await process_video_file(
-        detector=detector,
-        seg_detector=seg_detector,
-        video_path=cfg.video_path,
-        saw_already_moving=None,
-        stone_already_present=None,
-        camera_id=cfg.camera_id
-    )
-    # await process_live_video(
+    # await process_video_file(
     #     detector=detector,
+    #     seg_detector=seg_detector,
+    #     video_path=cfg.video_path,
+    #     saw_already_moving=None,
+    #     stone_already_present=None,
     #     camera_id=cfg.camera_id
     # )
 

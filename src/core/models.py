@@ -32,9 +32,6 @@ class Event(Base):
     camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"))
     camera: Mapped['Camera'] = relationship(back_populates="event")
 
-    # camera_roi_id: Mapped[int] = mapped_column(ForeignKey("camera_rois.id"))
-    # camera_roi: Mapped['RegionOfInterest'] = relationship(back_populates="event")
-
     time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp? 'date' as per api
 
     machine: Mapped[str] = mapped_column(String, nullable=True)  # station No. as per api
@@ -149,9 +146,6 @@ class Camera(Base):
     event: Mapped['Event'] = relationship(back_populates="camera")
 
     roi: Mapped[str] = mapped_column(String(255))
-
-    # roi_id: Mapped[int] = mapped_column(ForeignKey("roi_zones.id"))
-    # event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 

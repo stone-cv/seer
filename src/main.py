@@ -62,7 +62,7 @@ async def main():
     """ process video & detect objects """
     # logger.info('Detection started')
 
-    seg_detector.predict_custom('static/1.png')
+    seg_detector.predict_custom('static/test-start-sawing-short_1702639705_1702639796.mp4')
 
     # await process_video_file(
     #     detector=detector,

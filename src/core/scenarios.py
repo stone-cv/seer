@@ -92,9 +92,9 @@ async def process_video_file(
                                 )
                             
                             # test segmentation
-                            # if item['class_id'] == 0:  # stone class id
-                            #     seg_results = seg_detector.predict_custom(source=frame)
-                                # logger.info(seg_results)
+                            if item['class_id'] == 0:  # stone class id
+                                seg_results = seg_detector.predict_custom(source=frame)
+                                logger.info(seg_results)
 
                     # stone logic
                     stone_already_present, stone_history = await check_if_object_present(

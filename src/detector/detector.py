@@ -99,7 +99,8 @@ class ObjectDetection:
             source=source,
             device=self.device,
             conf=0.5,
-            save=True,
+            stream=True,
+            show=True
         )
         
         return results

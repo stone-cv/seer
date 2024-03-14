@@ -100,7 +100,7 @@ class Detector:
             device=self.device,
             conf=0.3,
             # stream=True,
-            # show=True
+            show=True
         )
         
         return results

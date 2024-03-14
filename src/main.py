@@ -31,13 +31,13 @@ async def main():
     seg_detector = Detector(mode='seg')
 
     """ init application """
-    app = Application()
-    app.start()
-    try:
-        while app.status == 1:
-            await asyncio.sleep(5)
-    except KeyboardInterrupt:
-        app.stop()
+    # app = Application()
+    # app.start()
+    # try:
+    #     while app.status == 1:
+    #         await asyncio.sleep(5)
+    # except KeyboardInterrupt:
+    #     app.stop()
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -66,14 +66,14 @@ async def main():
     # endregion
 
 
-    # await process_video_file(
-    #     detector=detector,
-    #     seg_detector=seg_detector,
-    #     video_path=cfg.video_path,
-    #     saw_already_moving=None,
-    #     stone_already_present=None,
-    #     camera_id=cfg.camera_id
-    # )
+    await process_video_file(
+        detector=detector,
+        seg_detector=seg_detector,
+        video_path=cfg.video_path,
+        saw_already_moving=None,
+        stone_already_present=None,
+        camera_id=cfg.camera_id
+    )
 
 
 if __name__ == '__main__':

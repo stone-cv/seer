@@ -18,7 +18,7 @@ from core.logger import logger
 
 class ObjectDetection:
 
-    def __init__(self, capture_index, mode: str):
+    def __init__(self, mode: str, capture_index: int = 0):
        
         self.capture_index = capture_index
         
@@ -158,6 +158,38 @@ class ObjectDetection:
             logger.error(e)
         
         return frame_pred  # detections
+    
+
+    def parse_segmentations(self, results):
+
+        for result in results:
+            # for mask, box in zip(result.masks.xy, result.boxes):
+            for mask in result.masks.xy:
+                logger.debug(f'Mask coords: {mask}')
+                mask_np = np.int32([mask])
+
+            return mask_np
+        
+    
+    def plot_segmentation(self, segment, image):
+                
+        img_open = cv2.imread(image)
+
+        # draw contour
+        cv2.polylines(img_open, segment, True, (255, 0, 0), 1)
+
+        # draw mask
+        # mask_img = np.zeros_like(img)
+        # cv2.drawContours(mask_img, segment, 0, (255, 0, 0), -1)
+        # img = cv2.addWeighted(img_open, 1, mask_img, 0.5, 0)
+
+        # cv2.fillPoly(img_open, segment, colors[color_number])  # crashes
+
+        cv2.imshow("Image", img_open)
+        cv2.waitKey(0)
+        # cv2.imwrite(f"{cfg.results_dir}/{img_open}", img_open)
+
+        return img_open
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):

@@ -38,7 +38,7 @@ class Application:
         self.__stone_already_present: bool = None
         self.__stone_history: List[bool] = []
         # self.__last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
-        self.__last_video_end: datetime = datetime(2024, 3, 7, 10, 19, 39)
+        self.__last_video_end: datetime = datetime(2024, 3, 13, 17, 40, 6)
         # self.__timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -203,23 +203,23 @@ class Application:
         """
         while True:
             item = await self.__queue_process_video.get()
-            try:
-                self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
-                    detector=self.__detector,
-                    seg_detector=self.__detector_seg,
-                    video_path=item,
-                    camera_id=self.__camera_id,
-                    saw_already_moving = self.__saw_already_moving,
-                    stone_already_present = self.__stone_already_present,
-                    stone_history = self.__stone_history
-                )
-                _, self.__last_video_end = get_time_from_video_path(item)
-            except Exception as e:
-                print(e)
-            finally:
-                self.__queue_process_video.task_done()
-        
-                # снова генерим даты для нового видео
-                await self.generate_datetime_queue(
-                    start_time=self.__last_video_end
-                )
+            # try:
+            #     self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
+            #         detector=self.__detector,
+            #         seg_detector=self.__detector_seg,
+            #         video_path=item,
+            #         camera_id=self.__camera_id,
+            #         saw_already_moving = self.__saw_already_moving,
+            #         stone_already_present = self.__stone_already_present,
+            #         stone_history = self.__stone_history
+            #     )
+            _, self.__last_video_end = get_time_from_video_path(item)
+            # except Exception as e:
+            #     print(e)
+            # finally:
+            self.__queue_process_video.task_done()
+    
+            # снова генерим даты для нового видео
+            await self.generate_datetime_queue(
+                start_time=self.__last_video_end
+            )

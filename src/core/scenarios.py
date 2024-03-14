@@ -92,12 +92,12 @@ async def process_video_file(
                                 )
                             
                             # test segmentation
-                            if item['class_id'] == 0:  # stone class id
-                                seg_results = seg_detector.predict_custom(source=frame)
-                                logger.info(seg_results)
+                            # if item['class_id'] == 0:  # stone class id
+                            #     seg_results = seg_detector.predict_custom(source=frame)
+                            #     logger.info(seg_results)
 
                     # stone logic
-                    stone_already_present, stone_history = await check_if_object_present(
+                    stone_already_present, stone_history = await check_if_stone_present_or_transferred(
                         db_session=session,
                         stone_id=0,  # stone class id
                         detected_class_ids=class_ids,
@@ -208,7 +208,7 @@ async def process_live_video(
                                     )
 
                         # stone logic
-                        stone_already_present = await check_if_object_present(
+                        stone_already_present = await check_if_stone_present_or_transferred(
                             db_session=session,
                             stone_id=0,  # stone class id
                             detected_class_ids=class_ids,
@@ -336,6 +336,31 @@ def is_moving(
     in_motion = magnitude > threshold
 
     return in_motion
+
+
+def calculate_segment_area(
+        segment,
+        ratio_px_to_cm: float = 1.2  # 0.8 recalculate
+) -> float:
+    """
+    Функция, позволяющая рассчитать площадь сегмента в сантиметрах квадратных.
+
+    Args:
+        segment (List[float]): координаты сегмента в формате XYXY
+        ratio_px_to_cm (float): коэффициент пересчета пикселей в сантиметры
+    
+    Returns:
+        float: площадь сегмента в сантиметрах квадратных
+    """
+    # contours, _ = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+    
+    area_px = cv2.contourArea(segment)
+    logger.info(f'Contour area: {area_px} px')
+
+    area_cm2 = round(area_px / (ratio_px_to_cm ** 2))
+    logger.info(f'Slab area: {area_cm2} cm^2')
+
+    return area_cm2
 
 
 def convert_xywh_to_xyxy(bbox_xywh):
@@ -488,7 +513,7 @@ async def check_for_motion(
     return saw_track_magn, already_moving
 
 
-async def check_if_object_present(
+async def check_if_stone_present_or_transferred(
         db_session: AsyncSession,
         detected_class_ids: List[int],
         object_history: List[bool],

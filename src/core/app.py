@@ -8,7 +8,7 @@ from fastapi import APIRouter
 
 import core.config as cfg
 from core.logger import logger
-from detector.detector import ObjectDetection
+from detector.detector import Detector
 from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
@@ -22,7 +22,7 @@ from core.utils import get_time_from_video_path
 class Application:
     def __init__(self):
         self.status: int = 0  # 0 - stopped, 1 - running
-        self.__detector: ObjectDetection = ObjectDetection(capture_index=0)
+        self.__detector: Detector = Detector(capture_index=0)
         self.__camera_id: int = cfg.camera_id
         self.__queue_search_video: asyncio.Queue = asyncio.Queue()
         self.__queue_download_video: asyncio.Queue = asyncio.Queue()

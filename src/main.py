@@ -5,7 +5,7 @@ import core.config as cfg
 from core.logger import logger
 from core.database import Base
 from core.database import db_engine
-from detector.detector import ObjectDetection
+from detector.detector import Detector
 from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
@@ -19,15 +19,15 @@ async def main():
     logger.info('App initiated')
 
     """ init application """
-    app = Application()
-    app.start()
-    try:
-        while app.status == 1:
-            await asyncio.sleep(5)
-    except KeyboardInterrupt:
-        app.stop()
+    # app = Application()
+    # app.start()
+    # try:
+    #     while app.status == 1:
+    #         await asyncio.sleep(5)
+    # except KeyboardInterrupt:
+    #     app.stop()
 
-    detector = ObjectDetection(capture_index=0)  # here? source?
+    detector = Detector(capture_index=0)  # here? source?
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -60,13 +60,13 @@ async def main():
     """ process video & detect objects """
     # logger.info('Detection started')
 
-    # await process_video_file(
-    #     detector=detector,
-    #     video_path=cfg.video_path,
-    #     saw_already_moving=None,
-    #     stone_already_present=True,
-    #     camera_id=cfg.camera_id
-    # )
+    await process_video_file(
+        detector=detector,
+        video_path=cfg.video_path,
+        saw_already_moving=None,
+        stone_already_present=True,
+        camera_id=cfg.camera_id
+    )
     # await process_live_video(
     #     detector=detector,
     #     camera_id=cfg.camera_id

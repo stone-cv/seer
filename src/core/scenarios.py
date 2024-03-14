@@ -5,14 +5,14 @@ import numpy as np
 from typing import List
 from datetime import datetime
 from datetime import timedelta
-
+from threading import Thread
 from sqlalchemy.ext.asyncio import AsyncSession
 
 import core.config as cfg
 from core.logger import logger
 from tracker.tracker import Sort
 from tracker.tracker_dpsort import Tracker
-from detector.detector import ObjectDetection
+from detector.detector import Detector
 from core.models import Event
 from core.models import Camera
 from core.database import SessionLocal
@@ -22,7 +22,7 @@ from core.utils import get_time_from_video_path
 
 
 async def process_video_file(
-    detector: ObjectDetection,
+    detector: Detector,
     video_path: str,
     camera_id: int,
     saw_already_moving: bool = None,
@@ -65,6 +65,12 @@ async def process_video_file(
                 logger.debug(f'Detection time: {detection_time}')
 
                 results = detector.predict_custom(source=frame)
+                # results = Thread(
+                #     target=detector.thread_safe_predict,
+                #     args=(frame, ),
+                #     daemon=True
+                # ).start()
+
                 for result in results:
                     detections = detector.parse_detections(result)
 

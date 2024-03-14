@@ -16,7 +16,7 @@ import core.config as cfg
 from core.logger import logger
 
 
-class ObjectDetection:
+class Detector:
 
     def __init__(self, capture_index):
        
@@ -36,7 +36,7 @@ class ObjectDetection:
     def load_model(self):
        
         # model = YOLO("yolov8l.pt")  # load a pretrained YOLOv8n model
-        model = YOLO(cfg.weights_path)
+        model = YOLO(cfg.weights_det)
         model.fuse()
     
         return model
@@ -102,16 +102,19 @@ class ObjectDetection:
         return results
     
 
-    def predict_vid_showcase(self, video_path):
+    def thread_safe_predict(self, source):  # add mode 
 
-        results = self.model.predict(
-        source=video_path,
-        show=True,
-        save=True,
-        save_txt=True,
-        device="mps",
+        # Instantiate a new model inside the thread
+        local_model = self.load_model()
+
+        results = local_model.predict(
+            source=source,
+            device=self.device,
+            conf=0.3,
+            # stream=True,
+            # show=True
         )
-        
+
         return results
     
 
@@ -276,5 +279,5 @@ class ObjectDetection:
         
         
 if __name__ == '__main__':
-    detector = ObjectDetection(capture_index=0)
+    detector = Detector(capture_index=0)
     detector()

@@ -12,7 +12,7 @@ import core.config as cfg
 from core.logger import logger
 from core.database import Base
 from core.database import db_engine
-from detector.detector import ObjectDetection
+from detector.detector import Detector
 from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
@@ -27,17 +27,17 @@ async def main():
 
     logger.info('App initiated')
 
-    """ init application """
-    # app = Application()
-    # app.start()
-    # try:
-    #     while app.status == 1:
-    #         await asyncio.sleep(5)
-    # except KeyboardInterrupt:
-    #     app.stop()
+    detector = Detector(mode='det')
+    seg_detector = Detector(mode='seg')
 
-    detector = ObjectDetection(mode='det')
-    seg_detector = ObjectDetection(mode='seg')
+    """ init application """
+    app = Application()
+    app.start()
+    try:
+        while app.status == 1:
+            await asyncio.sleep(5)
+    except KeyboardInterrupt:
+        app.stop()
 
     """ create db """
     # async with db_engine.begin() as conn:
@@ -57,12 +57,11 @@ async def main():
 
     # region segmentation
 
-    img = 'static/1.png'
-    results = seg_detector.model(img)
-    segment = seg_detector.parse_segmentations(results)
-    seg_detector.plot_segmentation(segment, img)
-    calculate_segment_area(segment)
-
+    # img = 'static/1.png'
+    # results = seg_detector.model(img)
+    # segment = seg_detector.parse_segmentations(results)
+    # seg_detector.plot_segmentation(segment, img)
+    # calculate_segment_area(segment)
 
     # endregion
 

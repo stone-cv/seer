@@ -16,7 +16,7 @@ import core.config as cfg
 from core.logger import logger
 
 
-class ObjectDetection:
+class Detector:
 
     def __init__(self, mode: str, capture_index: int = 0):
        
@@ -106,6 +106,22 @@ class ObjectDetection:
         return results
     
 
+    def thread_safe_predict(self, mode, source):
+
+        # Instantiate a new model inside the thread
+        local_model = self.load_model(mode)
+
+        results = local_model.predict(
+            source=source,
+            device=self.device,
+            conf=0.3,
+            # stream=True,
+            # show=True
+        )
+
+        return results
+    
+
     def track_custom(self, source):
 
         results = self.model.track(
@@ -165,8 +181,8 @@ class ObjectDetection:
         for result in results:
             # for mask, box in zip(result.masks.xy, result.boxes):
             for mask in result.masks.xy:
-                logger.debug(f'Mask coords: {mask}')
                 mask_np = np.int32([mask])
+                logger.debug(f'Mask coords: {type(mask_np)}')
 
             return mask_np
         
@@ -289,5 +305,5 @@ class ObjectDetection:
         
         
 if __name__ == '__main__':
-    detector = ObjectDetection(capture_index=0)
+    detector = Detector(capture_index=0)
     detector()

@@ -119,6 +119,12 @@ class Detector:
             # show=True
         )
 
+        # implementation
+        # results = Thread(
+                #     target=Detector.thread_safe_predict,
+                #     args=('det', frame, ),
+                # ).start()
+
         return results
     
 

@@ -63,10 +63,6 @@ async def process_video_file(
                 logger.debug(f'Detection time: {detection_time}')
 
                 results = detector.track_custom(source=frame)
-                # results = Thread(
-                #     target=Detector.thread_safe_predict,
-                #     args=('det', frame, ),
-                # ).start()
 
                 for result in results:
                     frame_pred = detector.parse_detections(result)  # _ / detections for an outside tracker

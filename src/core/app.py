@@ -15,10 +15,6 @@ from core.scenarios import process_video_file
 from core.utils import get_time_from_video_path
 
 
-# app = FastAPI(title="Seer")
-# api_router = APIRouter()
-
-
 class Application:
     def __init__(self):
         self.status: int = 0  # 0 - stopped, 1 - running
@@ -37,7 +33,6 @@ class Application:
         self.saw_already_moving: bool = None
         self.stone_already_present: bool = None
         self.stone_history: List[bool] = []
-        # self.last_video_end: datetime = datetime.now()-timedelta(minutes=self.__deep_archive)
         self.last_video_end: datetime = datetime(2024, 3, 13, 20, 53, 16)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")

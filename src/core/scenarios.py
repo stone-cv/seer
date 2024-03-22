@@ -107,7 +107,7 @@ async def process_video_file(
                     )
 
                     # area calculation
-                    # logger.info(stone_area_list)
+                    logger.info(stone_area_list)
                     stone_area, stone_area_list = await get_stone_area(
                         db_session=session,
                         frame=frame,
@@ -260,45 +260,6 @@ def convert_xywh_to_xyxy(bbox_xywh):
     x2 = x + w
     y2 = y + h
     return [x1, y1, x2, y2]
-
-def calculate_iou(box1, box2):
-    # Calculate the intersection area
-    x1 = max(box1[0], box2[0])
-    y1 = max(box1[1], box2[1])
-    x2 = min(box1[2], box2[2])
-    y2 = min(box1[3], box2[3])
-
-    intersection_area = max(0, x2 - x1) * max(0, y2 - y1)
-
-    # Calculate the union area
-    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
-    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
-    union_area = area_box1 + area_box2 - intersection_area
-
-    # Calculate IoU
-    iou = intersection_area / union_area
-    return iou
-
-def detect_occlusion(detected_bbox, reference_bbox, size_threshold=0.7, iou_threshold=0.5):
-    # Convert xywh format to xyxy format
-    detected_bbox_xyxy = convert_xywh_to_xyxy(detected_bbox)
-    reference_bbox_xyxy = convert_xywh_to_xyxy(reference_bbox)
-
-    # Calculate the areas of the detected and reference bounding boxes
-    area_detected = detected_bbox[2] * detected_bbox[3]
-    area_reference = reference_bbox[2] * reference_bbox[3]
-
-    # Compare the sizes of the bounding boxes
-    size_difference = area_detected / area_reference
-
-    # Calculate IoU between the two bounding boxes
-    iou = calculate_iou(detected_bbox_xyxy, reference_bbox_xyxy)
-
-    # Check for occlusion based on size difference and IoU threshold
-    if size_difference < size_threshold and iou > iou_threshold:
-        return True
-    else:
-        return False
 
 
 async def check_for_motion(
@@ -597,15 +558,15 @@ async def get_stone_area(
         # all(obj_present_result for obj_present_result in stone_history[-(curr_fps * 10):])
     ):
         if len(stone_area_list) < cfg.max_stone_area_list:
-            seg_results = seg_detector.predict_custom(source=frame)
+            seg_results = seg_detector.model(source=frame)
             if seg_results[0].masks:  # check if there are masks
                 segment = seg_detector.parse_segmentation(seg_results)
+                # seg_detector.plot_segmentation(segment, frame)
 
                 stone_area_prelim = calculate_segment_area(segment)
                 if stone_area_prelim > 0:
                     stone_area_list.append(stone_area_prelim)
 
-                # seg_detector.plot_segmentation(segment, frame)
         else:
             stone_area = np.average(stone_area_list)
             logger.info(f'Average stone area: {stone_area}')
@@ -616,7 +577,7 @@ async def get_stone_area(
                 type_id=5,  # rm hardcoded id
                 camera_id=camera_id,
                 time=detection_time,
-                comment=stone_area
+                comment=f'{stone_area} cm2'
             )
             logger.info(f'Stone area calculated ({stone_area}) at {detection_time}')
 
@@ -676,6 +637,46 @@ async def get_event_end_time(events: dict, track_id: int):
                     last_detection_time = item["time"]
 
     return last_detection_time
+
+
+def calculate_iou(box1, box2):
+    # Calculate the intersection area
+    x1 = max(box1[0], box2[0])
+    y1 = max(box1[1], box2[1])
+    x2 = min(box1[2], box2[2])
+    y2 = min(box1[3], box2[3])
+
+    intersection_area = max(0, x2 - x1) * max(0, y2 - y1)
+
+    # Calculate the union area
+    area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
+    area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
+    union_area = area_box1 + area_box2 - intersection_area
+
+    # Calculate IoU
+    iou = intersection_area / union_area
+    return iou
+
+def detect_occlusion(detected_bbox, reference_bbox, size_threshold=0.7, iou_threshold=0.5):
+    # Convert xywh format to xyxy format
+    detected_bbox_xyxy = convert_xywh_to_xyxy(detected_bbox)
+    reference_bbox_xyxy = convert_xywh_to_xyxy(reference_bbox)
+
+    # Calculate the areas of the detected and reference bounding boxes
+    area_detected = detected_bbox[2] * detected_bbox[3]
+    area_reference = reference_bbox[2] * reference_bbox[3]
+
+    # Compare the sizes of the bounding boxes
+    size_difference = area_detected / area_reference
+
+    # Calculate IoU between the two bounding boxes
+    iou = calculate_iou(detected_bbox_xyxy, reference_bbox_xyxy)
+
+    # Check for occlusion based on size difference and IoU threshold
+    if size_difference < size_threshold and iou > iou_threshold:
+        return True
+    else:
+        return False
 
 
 async def process_live_video(

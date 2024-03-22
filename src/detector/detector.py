@@ -195,10 +195,10 @@ class Detector:
     
     def plot_segmentation(self, segment, image):
                 
-        img_open = cv2.imread(image)
+        # image = cv2.imread(image)
 
         # draw contour
-        cv2.polylines(img_open, segment, True, (255, 0, 0), 1)
+        cv2.polylines(image, segment, True, (255, 0, 0), 1)
 
         # draw mask
         # mask_img = np.zeros_like(img)
@@ -207,11 +207,11 @@ class Detector:
 
         # cv2.fillPoly(img_open, segment, colors[color_number])  # crashes
 
-        cv2.imshow("Image", img_open)
+        cv2.imshow("Image", image)
         cv2.waitKey(0)
         # cv2.imwrite(f"{cfg.results_dir}/{img_open}", img_open)
 
-        return img_open
+        return image
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):

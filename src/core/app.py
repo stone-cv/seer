@@ -33,24 +33,26 @@ class Application:
         self.saw_already_moving: bool = None
         self.stone_already_present: bool = None
         self.stone_history: List[bool] = []
-        self.last_video_end: datetime = datetime(2024, 3, 13, 20, 53, 16)
+        self.stone_area_list: List[float] = []
+        self.stone_area: float = 0
+        self.last_video_end: datetime = datetime(2024, 3, 18, 11, 9, 30)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
     def start(self):
         # генерируем воркеров для поиска видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__search_for_video_files())
+            task = asyncio.Task(self.search_for_video_files())
             self.tasks_search_video.append(task)
 
         # генерируем воркеров для скачивания видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__download_video_files())
+            task = asyncio.Task(self.download_video_files())
             self.tasks_download_video.append(task)
 
         # генерируем воркеров для обработки видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__process_video_file())
+            task = asyncio.Task(self.process_video_file())
             self.tasks_process_video.append(task)
 
         # генерируем таск для получения вставки дат и времени в очередь
@@ -100,17 +102,17 @@ class Application:
         self.queue_process_video: asyncio.Queue = asyncio.Queue()
         self.task_generate: asyncio.Task = None
         for _ in range(1):
-            task = asyncio.Task(self.__search_for_video_files())
+            task = asyncio.Task(self.search_for_video_files())
             self.tasks_search_video.append(task)
 
         # генерируем воркеров для скачивания видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__download_video_files())
+            task = asyncio.Task(self.download_video_files())
             self.tasks_download_video.append(task)
 
         # генерируем воркеров для обработки видео файлов
         for _ in range(1):
-            task = asyncio.Task(self.__process_video_file())
+            task = asyncio.Task(self.process_video_file())
             self.tasks_process_video.append(task)
 
         # генерируем таск для получения вставки дат и времени в очередь
@@ -131,7 +133,7 @@ class Application:
         
         # await asyncio.sleep(self.__delay)
 
-    async def __search_for_video_files(self):
+    async def search_for_video_files(self):
         """
         ???
         """
@@ -173,7 +175,7 @@ class Application:
             finally:
                 self.queue_search_video.task_done()
 
-    async def __download_video_files(self):
+    async def download_video_files(self):
         """
         ???
         """
@@ -192,27 +194,29 @@ class Application:
             finally:
                 self.queue_download_video.task_done()
     
-    async def __process_video_file(self):
+    async def process_video_file(self):
         """
         ???
         """
         while True:
             item = await self.queue_process_video.get()
-            # try:
-            #     self.__saw_already_moving, self.__stone_already_present, self.__stone_history = await process_video_file(
-            #         detector=self.__detector,
-            #         seg_detector=self.__detector_seg,
-            #         video_path=item,
-            #         camera_id=self.__camera_id,
-            #         saw_already_moving = self.__saw_already_moving,
-            #         stone_already_present = self.__stone_already_present,
-            #         stone_history = self.__stone_history
-            #     )
-            _, self.last_video_end = get_time_from_video_path(item)
-            # except Exception as e:
-            #     print(e)
-            # finally:
-            self.queue_process_video.task_done()
+            try:
+                self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area = await process_video_file(
+                    detector=self.detector,
+                    seg_detector=self.detector_seg,
+                    video_path=item,
+                    camera_id=self.camera_id,
+                    saw_already_moving = self.saw_already_moving,
+                    stone_already_present = self.stone_already_present,
+                    stone_history = self.stone_history,
+                    stone_area_list = self.stone_area_list,
+                    stone_area = self.stone_area
+                )
+                _, self.last_video_end = get_time_from_video_path(item)
+            except Exception as e:
+                print(e)
+            finally:
+                self.queue_process_video.task_done()
     
             # снова генерим даты для нового видео
             await self.generate_datetime_queue(

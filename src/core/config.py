@@ -51,6 +51,7 @@ stone_change_threshold = config['Stone_logic']['stone_change_threshold']
 forklift_history_threshold = config['Stone_logic']['forklift_history_threshold']
 forklift_present_threshold = config['Stone_logic']['forklift_present_threshold']
 majority_threshold = config['Stone_logic']['majority_threshold']
+max_stone_area_list = config['Stone_logic']['max_stone_area_list']
 
 # Database
 db_host = config['Database']['db_host']

@@ -18,7 +18,6 @@ from core.utils import send_event_json
 from core.utils import get_time_from_video_path
 
 
-# combine process file & live in one method
 async def process_video_file(
     detector: Detector,
     seg_detector: Detector,
@@ -26,7 +25,9 @@ async def process_video_file(
     camera_id: int,
     saw_already_moving: bool = False,
     stone_already_present: bool = False,
-    stone_history: List[bool] = []
+    stone_history: List[bool] = [],
+    stone_area_list: List[float] = [],
+    stone_area: float = 0
 ) -> tuple:
     """
     ???
@@ -90,11 +91,6 @@ async def process_video_file(
                                     detection_time=detection_time,
                                     camera_id=camera_id
                                 )
-                            
-                            # test segmentation
-                            # if item['class_id'] == 0:  # stone class id
-                            #     seg_results = seg_detector.predict_custom(source=frame)
-                            #     logger.info(seg_results)
 
                     # stone logic
                     stone_already_present, stone_history = await check_if_stone_present_or_transferred(
@@ -110,16 +106,29 @@ async def process_video_file(
                         camera_id=camera_id
                     )
 
+                    # area calculation
+                    # logger.info(stone_area_list)
+                    stone_area, stone_area_list = await get_stone_area(
+                        db_session=session,
+                        frame=frame,
+                        seg_detector=seg_detector,
+                        stone_already_present=stone_already_present,
+                        stone_area_list=stone_area_list,
+                        stone_area=stone_area,
+                        saw_already_moving=saw_already_moving,
+                        curr_fps=curr_fps,
+                        camera_id=camera_id,
+                        detection_time=detection_time
+                    )
+
                 logger.debug(f'results: {frame_pred}')
-                all_results[frame_idx] = frame_pred
+                # all_results[frame_idx] = frame_pred
 
     # except StopIteration:
     except Exception as exc:
         logger.error(exc)
 
-    # cv2.destroyAllWindows()
-
-    return (saw_already_moving, stone_already_present, stone_history)
+    return (saw_already_moving, stone_already_present, stone_history, stone_area_list, stone_area)
 
 
 async def is_in_roi(
@@ -559,6 +568,66 @@ async def check_if_stone_present_or_transferred(
         object_history.clear()
 
     return object_already_present, object_history
+
+
+async def get_stone_area(
+    db_session: AsyncSession,
+    frame: np.ndarray,
+    seg_detector: Detector,
+    stone_already_present: bool,
+    # stone_history: List[bool],
+    stone_area_list: List[float],
+    stone_area: float,
+    saw_already_moving: bool,
+    curr_fps: int,
+    camera_id: int,
+    detection_time: datetime
+):
+    # если каменя нет или он пропал, то обнуляем площадь и не вычисляем, пока не появится
+    if not stone_already_present:
+        stone_area = 0
+        stone_area_list.clear()
+
+    if (
+        stone_area == 0 and
+        stone_already_present and
+        not saw_already_moving
+        # 0 in class_ids and  # stone class id
+        # 2 not in class_ids and  # forklift class id
+        # all(obj_present_result for obj_present_result in stone_history[-(curr_fps * 10):])
+    ):
+        if len(stone_area_list) < cfg.max_stone_area_list:
+            seg_results = seg_detector.predict_custom(source=frame)
+            if seg_results[0].masks:  # check if there are masks
+                segment = seg_detector.parse_segmentation(seg_results)
+
+                stone_area_prelim = calculate_segment_area(segment)
+                if stone_area_prelim > 0:
+                    stone_area_list.append(stone_area_prelim)
+
+                # seg_detector.plot_segmentation(segment, frame)
+        else:
+            stone_area = np.average(stone_area_list)
+            logger.info(f'Average stone area: {stone_area}')
+
+            # create event
+            event = await Event.event_create(
+                db_session=db_session,
+                type_id=5,  # rm hardcoded id
+                camera_id=camera_id,
+                time=detection_time,
+                comment=stone_area
+            )
+            logger.info(f'Stone area calculated ({stone_area}) at {detection_time}')
+
+            if cfg.send_json:
+                json = await Event.convert_event_to_json(
+                    db_session=db_session,
+                    event=event,
+                )
+                await send_event_json(data=json)
+    
+    return stone_area, stone_area_list
 
 
 # region currently_not_used

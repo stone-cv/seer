@@ -182,7 +182,7 @@ class Detector:
         return frame_pred  # detections
     
 
-    def parse_segmentations(self, results):
+    def parse_segmentation(self, results):
 
         for result in results:
             # for mask, box in zip(result.masks.xy, result.boxes):

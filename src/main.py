@@ -57,7 +57,7 @@ async def main():
 
     # region segmentation
 
-    # img = 'static/1.png'
+    # img = '/Users/macbook/Pictures/vlcsnap-2024-03-14-12h02m57s272.png'
     # results = seg_detector.model(img)
     # segment = seg_detector.parse_segmentations(results)
     # seg_detector.plot_segmentation(segment, img)

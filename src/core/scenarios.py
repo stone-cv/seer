@@ -107,7 +107,7 @@ async def process_video_file(
                     )
 
                     # area calculation
-                    logger.info(stone_area_list)
+                    logger.debug(stone_area_list)
                     stone_area, stone_area_list = await get_stone_area(
                         db_session=session,
                         frame=frame,
@@ -245,10 +245,10 @@ def calculate_segment_area(
     # contours, hierarchy = cv2.findContours(mask.astype(np.uint8), cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
 
     area_px = cv2.contourArea(segment_coord)
-    logger.info(f'Contour area: {area_px} px')
+    logger.debug(f'Contour area: {area_px} px')
 
     area_cm2 = round(area_px / (ratio_px_to_cm ** 2))
-    logger.info(f'Slab area: {area_cm2} cm^2')
+    logger.debug(f'Slab area: {area_cm2} cm^2')
 
     return area_cm2
 
@@ -569,7 +569,7 @@ async def get_stone_area(
 
         else:
             stone_area = np.average(stone_area_list)
-            logger.info(f'Average stone area: {stone_area}')
+            logger.debug(f'Average stone area: {stone_area}')
 
             # create event
             event = await Event.event_create(

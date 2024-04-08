@@ -23,14 +23,14 @@ class Detector:
         self.capture_index = capture_index
         
         # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.device = 'mps'
+        self.device = 'mps'  # 'cpu'
         print("Using Device: ", self.device)
         
         self.model = self.load_model(mode)
         
         self.CLASS_NAMES_DICT = self.model.model.names
     
-        self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
+        # self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
     
 
     def load_model(self, mode: str):
@@ -83,14 +83,14 @@ class Detector:
         if split_required:
             self.split_dataset()
 
-        # results = self.model.train(
-        #     data=data,
-        #     epochs=10,
-        #     batch=8,
-        #     device='cpu'
-        # )
+        results = self.model.train(
+            data=data,
+            epochs=10,
+            batch=8,
+            device=self.device
+        )
 
-        # return results
+        return results
 
 
     def predict_custom(self, source):
@@ -100,7 +100,7 @@ class Detector:
             device=self.device,
             conf=0.3,
             # stream=True,
-            show=True
+            # show=True
         )
         
         return results
@@ -135,7 +135,7 @@ class Detector:
             persist=True,
             conf=0.3,
             iou=0.5,
-            device='mps',
+            device=self.device,
             # tracker="bytetrack.yaml",
             # stream=True,
             show=True

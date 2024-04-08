@@ -124,35 +124,35 @@ def get_time_from_video_path(
     return start_time, end_time
 
 
-def xml_helper(
-        start_time: datetime,
-        end_time: datetime,
-        track_id: int
-) -> str:
-    """ формат lxml файла для передачи параметров поиска файлов"""
+# def xml_helper(
+#         start_time: datetime,
+#         end_time: datetime,
+#         track_id: int
+# ) -> str:
+#     """ формат lxml файла для передачи параметров поиска файлов"""
 
-    max_result = 1300
-    search_position = 0
-    search_id = uuid.uuid4()
-    metadata = '//recordType.meta.std-cgi.com'
+#     max_result = 1300
+#     search_position = 0
+#     search_id = uuid.uuid4()
+#     metadata = '//recordType.meta.std-cgi.com'
 
-    if isinstance(start_time, (datetime, datetime.date)): # Пока грубая проверка. В следующей версии будет все на Typing и передаваться будет строго datetime.
-        start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+#     if isinstance(start_time, (datetime, datetime.date)): # Пока грубая проверка. В следующей версии будет все на Typing и передаваться будет строго datetime.
+#         start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    if isinstance(end_time, datetime):
-        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+#     if isinstance(end_time, datetime):
+#         end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-    xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
-            f'<trackList><trackID>{track_id}</trackID></trackList>' \
-            f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
-            f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
-            f'<maxResults>{max_result}</maxResults>' \
-            f'<searchResultPostion>{search_position}</searchResultPostion>' \
-            f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
-            f'</CMSearchDescription> '
-    logger.debug(f'XML string: {xml_string}')
+#     xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
+#             f'<trackList><trackID>{track_id}</trackID></trackList>' \
+#             f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
+#             f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
+#             f'<maxResults>{max_result}</maxResults>' \
+#             f'<searchResultPostion>{search_position}</searchResultPostion>' \
+#             f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
+#             f'</CMSearchDescription> '
+#     logger.debug(f'XML string: {xml_string}')
 
-    return xml_string
+#     return xml_string
 
 
 async def send_event_json(

@@ -1,0 +1,6 @@
+[submodule "src/src/deep_sort"]
+	path = src/src/deep_sort
+	url = git@github.com:computervisioneng/deep_sort.git
+[submodule "src/JSON2YOLO"]
+	path = src/JSON2YOLO
+	url = git@github.com:ultralytics/JSON2YOLO.git

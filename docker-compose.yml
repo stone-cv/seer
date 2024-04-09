@@ -1,0 +1,20 @@
+version: "3"
+
+services:
+  db:
+    image: postgres:11
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./src/core/init.sql:/docker-entrypoint-initdb.d/init.sql
+    env_file: 
+      - .env
+    restart: unless-stopped
+
+  app:
+    build: .
+    command: python ./src/main.py
+    volumes:
+      - .:/code
+    depends_on:
+      - db

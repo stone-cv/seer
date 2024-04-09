@@ -167,6 +167,11 @@ results/
 deep_sort/
 datasets/
 *.ini
+temp/
+*.mp4
+*.mov
+*.png
+*.jpeg
 
 .DS_Store
 *.pt

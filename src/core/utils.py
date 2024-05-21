@@ -2,6 +2,7 @@ import os
 import cv2
 import uuid
 import httpx
+import numpy as np
 from datetime import datetime
 from typing import Any
 from typing import List
@@ -124,39 +125,41 @@ def get_time_from_video_path(
     return start_time, end_time
 
 
-# def xml_helper(
-#         start_time: datetime,
-#         end_time: datetime,
-#         track_id: int
-# ) -> str:
-#     """ формат lxml файла для передачи параметров поиска файлов"""
+def xml_helper(
+        start_time: datetime,
+        end_time: datetime,
+        track_id: int
+) -> str:
+    """ формат lxml файла для передачи параметров поиска файлов"""
 
-#     max_result = 1300
-#     search_position = 0
-#     search_id = uuid.uuid4()
-#     metadata = '//recordType.meta.std-cgi.com'
+    max_result = 1300
+    search_position = 0
+    search_id = uuid.uuid4()
+    metadata = '//recordType.meta.std-cgi.com'
 
-#     if isinstance(start_time, (datetime, datetime.date)): # Пока грубая проверка. В следующей версии будет все на Typing и передаваться будет строго datetime.
-#         start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    if isinstance(start_time, (datetime, datetime.date)): # TODO Typing & datetime
+        start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-#     if isinstance(end_time, datetime):
-#         end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    if isinstance(end_time, datetime):
+        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-#     xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
-#             f'<trackList><trackID>{track_id}</trackID></trackList>' \
-#             f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
-#             f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
-#             f'<maxResults>{max_result}</maxResults>' \
-#             f'<searchResultPostion>{search_position}</searchResultPostion>' \
-#             f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
-#             f'</CMSearchDescription> '
-#     logger.debug(f'XML string: {xml_string}')
+    xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
+            f'<trackList><trackID>{track_id}</trackID></trackList>' \
+            f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
+            f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
+            f'<maxResults>{max_result}</maxResults>' \
+            f'<searchResultPostion>{search_position}</searchResultPostion>' \
+            f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
+            f'</CMSearchDescription> '
+    logger.debug(f'XML string: {xml_string}')
 
-#     return xml_string
+    return xml_string
 
 
 async def send_event_json(
     data: str,
+    frame: np.ndarray,
+    detection_time: datetime,
     url: str = cfg.json_url,
     auth: str = cfg.json_auth_token
 ) -> httpx.Response:
@@ -164,9 +167,14 @@ async def send_event_json(
         "Content-Type": "application/json",
         "Authorization": auth
     }
+
+    filename = f'screenshot_{detection_time.strftime("%m-%d-%Y_%H-%M-%S")}.png'
+    saved_img = cv2.imwrite(filename, frame)
+    logger.debug(f"\n\n\nImage saved: {saved_img} ({filename})\n\n\n")
+
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url=url, headers=headers, content=data)
+            response = await client.post(url=url, headers=headers, content=data, files={'file': open(filename, 'rb')})
 
             if response.status_code == 200 or response.status_code == 201:
                 logger.info(f'JSON POST request sent successfully. Response: {response.text}')

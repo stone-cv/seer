@@ -3,6 +3,7 @@ import cv2
 import csv
 import random
 import shutil
+import torch
 import numpy as np
 import supervision as sv
 
@@ -194,7 +195,6 @@ class Detector:
         
     
     def plot_segmentation(self, segment, image):
-                
         # image = cv2.imread(image)
 
         # draw contour

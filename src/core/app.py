@@ -35,7 +35,7 @@ class Application:
         self.stone_history: List[bool] = []
         self.stone_area_list: List[float] = []
         self.stone_area: float = 0
-        self.last_video_end: datetime = datetime(2024, 4, 8, 11, 0, 0)
+        self.last_video_end: datetime = datetime(2024, 5, 21, 15, 50, 0)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -201,17 +201,17 @@ class Application:
         while True:
             item = await self.queue_process_video.get()
             try:
-                self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area = await process_video_file(
-                    detector=self.detector,
-                    seg_detector=self.detector_seg,
-                    video_path=item,
-                    camera_id=self.camera_id,
-                    saw_already_moving = self.saw_already_moving,
-                    stone_already_present = self.stone_already_present,
-                    stone_history = self.stone_history,
-                    stone_area_list = self.stone_area_list,
-                    stone_area = self.stone_area
-                )
+                # self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area = await process_video_file(
+                #     detector=self.detector,
+                #     seg_detector=self.detector_seg,
+                #     video_path=item,
+                #     camera_id=self.camera_id,
+                #     saw_already_moving = self.saw_already_moving,
+                #     stone_already_present = self.stone_already_present,
+                #     stone_history = self.stone_history,
+                #     stone_area_list = self.stone_area_list,
+                #     stone_area = self.stone_area
+                # )
                 _, self.last_video_end = get_time_from_video_path(item)
             except Exception as e:
                 print(e)

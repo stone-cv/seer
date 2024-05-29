@@ -88,7 +88,8 @@ class Detector:
             data=data,
             epochs=10,
             batch=8,
-            device=self.device
+            device=self.device,
+            resume=True,
         )
 
         return results

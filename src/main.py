@@ -49,7 +49,7 @@ async def main():
     # logger.info(f'Training started')
     # detector.train_custom(
     #     data='datasets/data.yaml',
-    #     split_required=True
+    #     split_required=False
     # )
     # logger.info(f'Training complete')
 

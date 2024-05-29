@@ -23,6 +23,7 @@ app_name = config['Application']['app_name']
 DEBUG = config['Application']['DEBUG']
 log_dir = config['Application']['log_dir']
 results_dir = config['Application']['results_dir']
+download_dir = config['Application']['download_dir']
 video_path = config['Application']['video_path']
 required_fps = config['Application']['required_fps']
 weights_det = config['Application']['weights_det']
@@ -32,6 +33,7 @@ delay = config['Application']['delay']
 
 send_json = config['Application']['send_json']
 json_url = config['Application']['json_url']
+img_url = config['Application']['img_url']
 json_auth_token = config['Application']['json_auth_token']
 
 # camera auth

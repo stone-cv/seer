@@ -13,6 +13,7 @@ from core.downloader import get_files_list
 from core.downloader import download_files
 from core.scenarios import process_video_file
 from core.utils import get_time_from_video_path
+from core.models import Event
 
 
 class Application:
@@ -35,7 +36,8 @@ class Application:
         self.stone_history: List[bool] = []
         self.stone_area_list: List[float] = []
         self.stone_area: float = 0
-        self.last_video_end: datetime = datetime(2024, 5, 21, 15, 50, 0)
+        self.event_list: List[Event] = []
+        self.last_video_end: datetime = datetime(2024, 5, 22, 13, 20, 0)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -169,6 +171,7 @@ class Application:
                     else:
                         logger.info(f"Successfully retrived video (start: {vid_start}, end: {vid_end})")
                         await self.queue_download_video.put(item)
+                        break  # redo
 
             except Exception as exc:
                 logger.error(exc)
@@ -201,17 +204,18 @@ class Application:
         while True:
             item = await self.queue_process_video.get()
             try:
-                # self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area = await process_video_file(
-                #     detector=self.detector,
-                #     seg_detector=self.detector_seg,
-                #     video_path=item,
-                #     camera_id=self.camera_id,
-                #     saw_already_moving = self.saw_already_moving,
-                #     stone_already_present = self.stone_already_present,
-                #     stone_history = self.stone_history,
-                #     stone_area_list = self.stone_area_list,
-                #     stone_area = self.stone_area
-                # )
+                self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
+                    detector=self.detector,
+                    seg_detector=self.detector_seg,
+                    video_path=item,
+                    camera_id=self.camera_id,
+                    saw_already_moving = self.saw_already_moving,
+                    stone_already_present = self.stone_already_present,
+                    stone_history = self.stone_history,
+                    stone_area_list = self.stone_area_list,
+                    event_list=self.event_list,
+                    stone_area = self.stone_area
+                )
                 _, self.last_video_end = get_time_from_video_path(item)
             except Exception as e:
                 print(e)

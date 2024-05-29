@@ -14,7 +14,7 @@ from core.models import Event
 from core.models import Camera
 from core.database import SessionLocal
 from core.utils import extract_frame
-from core.utils import send_event_json
+from core.utils import send_event_info
 from core.utils import get_time_from_video_path
 
 
@@ -27,7 +27,8 @@ async def process_video_file(
     stone_already_present: bool = False,
     stone_history: List[bool] = [],
     stone_area_list: List[float] = [],
-    stone_area: float = 0
+    stone_area: float = 0,
+    event_list: List[Event] = [],
 ) -> tuple:
     """
     ???
@@ -64,17 +65,18 @@ async def process_video_file(
                 logger.debug(f'Detection time: {detection_time}')
 
                 # region test posting img
-                event = await Event.event_create(
-                    db_session=session,
-                    type_id=4,  # rm hardcoded id
-                    camera_id=camera_id,
-                    time=detection_time
-                )
-                json = await Event.convert_event_to_json(
-                    db_session=session,
-                    event=event,
-                )
-                await send_event_json(frame=frame, data=json, detection_time=detection_time)
+                # event = await Event.event_create(
+                #     db_session=session,
+                #     type_id=4,  # rm hardcoded id
+                #     camera_id=camera_id,
+                #     time=detection_time
+                # )
+                # json = await Event.convert_event_to_json(
+                #     db_session=session,
+                #     event=event,
+                # )
+                # await send_event_info(frame=frame, data=json, detection_time=detection_time)
+                # return
                 # endregion
 
                 results = detector.track_custom(source=frame)
@@ -95,7 +97,7 @@ async def process_video_file(
 
                             # saw motion logic
                             if item['class_id'] == 1:  # saw class id
-                                saw_track_magn, saw_already_moving = await check_for_motion(
+                                saw_track_magn, saw_already_moving, saw_event = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
                                     detected_item=item,
@@ -106,9 +108,11 @@ async def process_video_file(
                                     camera_id=camera_id,
                                     frame=frame
                                 )
+                                if saw_event:
+                                    event_list.append(saw_event)
 
                     # stone logic
-                    stone_already_present, stone_history = await check_if_stone_present_or_transferred(
+                    stone_already_present, stone_history, stone_event = await check_if_stone_present_or_transferred(
                         db_session=session,
                         stone_id=0,  # stone class id
                         detected_class_ids=class_ids,
@@ -121,24 +125,49 @@ async def process_video_file(
                         camera_id=camera_id,
                         frame=frame
                     )
+                    if stone_event and stone_event.type_id != 2:
+                        event_list.append(stone_event)
 
                     # TODO: return event -> calculate area -> modify event with area -> send POST request
                     # TODO: check event type -> if 2 (stone removed) area = 0
 
-                    # area calculation
-                    # logger.debug(stone_area_list)
-                    # stone_area, stone_area_list = await get_stone_area(
-                    #     db_session=session,
-                    #     frame=frame,
-                    #     seg_detector=seg_detector,
-                    #     stone_already_present=stone_already_present,
-                    #     stone_area_list=stone_area_list,
-                    #     stone_area=stone_area,
-                    #     saw_already_moving=saw_already_moving,
-                    #     curr_fps=curr_fps,
-                    #     camera_id=camera_id,
-                    #     detection_time=detection_time
-                    # )
+                    if len(event_list) > 0:
+                        logger.debug(f'Event list: {event_list}')
+
+                        # area calculation
+                        stone_area, stone_area_list = await get_stone_area(
+                            db_session=session,
+                            frame=frame,
+                            seg_detector=seg_detector,
+                            stone_already_present=stone_already_present,
+                            stone_area_list=stone_area_list,
+                            stone_area=stone_area,
+                            saw_already_moving=saw_already_moving,
+                            curr_fps=curr_fps,
+                            camera_id=camera_id,
+                            detection_time=detection_time
+                        )
+
+                        logger.debug(f'Stone area: {stone_area}')
+                        if stone_area > 0:
+                            for event in event_list:
+                                logger.debug(f'Event: {event.__dict__}')
+
+                                event = await Event.event_update_stone_area(
+                                    db_session=session,
+                                    event_id=event.id,
+                                    stone_area=str(stone_area)
+                                )
+
+                                if cfg.send_json:
+                                    json = await Event.convert_event_to_json(
+                                        db_session=session,
+                                        event=event,
+                                    )
+                                    print(f'\n\n\n{json}\n\n\n')
+                                    await send_event_info(frame=frame, data=json,detection_time=detection_time)
+
+                                    event_list.remove(event)
 
                 logger.debug(f'results: {frame_pred}')
                 # all_results[frame_idx] = frame_pred
@@ -147,7 +176,7 @@ async def process_video_file(
     except Exception as exc:
         logger.error(exc)
 
-    return (saw_already_moving, stone_already_present, stone_history, stone_area_list, stone_area)
+    return (saw_already_moving, stone_already_present, stone_history, stone_area_list, stone_area, event_list)
 
 
 async def is_in_roi(
@@ -292,7 +321,7 @@ async def check_for_motion(
         detection_time: datetime,
         camera_id: int,
         frame: np.ndarray,
-) -> (float, bool):
+) -> tuple[float, bool]:
     """
     Функция, позволяющая определить, движется ли объект:
         - фиксируется величина смещения bbox'а за указанный
@@ -315,6 +344,8 @@ async def check_for_motion(
         saw_track_magn (float): обновленная величина смещения bbox'а
         already_moving (bool): обновленное значение
     """
+    event = None
+
     xywh_history.append(detected_item['xywh'])
 
     if len(xywh_history) > 1:
@@ -352,13 +383,6 @@ async def check_for_motion(
                 logger.info(f'The saw started moving at {detection_time}, magnitude: {saw_track_magn}')
                 already_moving = True
 
-                if cfg.send_json:
-                    json = await Event.convert_event_to_json(
-                        db_session=db_session,
-                        event=event,
-                    )
-                    await send_event_json(frame=frame, data=json,detection_time=detection_time)
-
             elif not in_motion and already_moving:
                 event = await Event.event_create(
                     db_session=db_session,
@@ -369,19 +393,12 @@ async def check_for_motion(
                 logger.info(f'The saw stopped moving at {detection_time}, magnitude: {saw_track_magn}')
                 already_moving = False
 
-                if cfg.send_json:
-                    json = await Event.convert_event_to_json(
-                        db_session=db_session,
-                        event=event,
-                    )
-                    await send_event_json(frame=frame, data=json, detection_time=detection_time)
-
             # clear history
             saw_track_magn = 0
             logger.debug('Saw magnitude nullified')
             xywh_history.clear()
 
-    return saw_track_magn, already_moving
+    return saw_track_magn, already_moving, event
 
 
 async def check_if_stone_present_or_transferred(
@@ -396,7 +413,7 @@ async def check_if_stone_present_or_transferred(
         frame: np.ndarray,
         stone_id: int = 0,
         forklift_id: int = 2
-) -> bool:
+):
     """
     Функция, позволяющая определить, присутствиует ли на видео объект:
         - фиксируется наличие или отсутствие детекции объекта заданного класса 
@@ -418,6 +435,8 @@ async def check_if_stone_present_or_transferred(
     Returns:
         object_already_present (bool): обновленное значение
     """
+    event = None
+
     logger.debug(f'Class IDs: {detected_class_ids}')
     if stone_id in detected_class_ids:
         object_history.append(True)
@@ -458,13 +477,6 @@ async def check_if_stone_present_or_transferred(
                 logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
                 object_already_present = True
 
-                if cfg.send_json:
-                    json = await Event.convert_event_to_json(
-                        db_session=db_session,
-                        event=event,
-                    )
-                    await send_event_json(frame=frame, data=json, detection_time=detection_time)
-
                 # object_history.clear()
             
             elif (
@@ -486,13 +498,6 @@ async def check_if_stone_present_or_transferred(
                 logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
                 object_already_present = False
 
-                if cfg.send_json:
-                    json = await Event.convert_event_to_json(
-                        db_session=db_session,
-                        event=event,
-                    )
-                    await send_event_json(frame=frame, data=json, detection_time=detection_time)
-
                 # object_history.clear()
     
     # region extra check if stone is present
@@ -510,13 +515,6 @@ async def check_if_stone_present_or_transferred(
         )
         logger.info(f'New stone detected at {detection_time-timedelta(minutes=1)}, event created: {event.__dict__}')
         object_already_present = True
-
-        if cfg.send_json:
-            json = await Event.convert_event_to_json(
-                db_session=db_session,
-                event=event,
-            )
-            await send_event_json(frame=frame, data=json, detection_time=detection_time)
     
     elif (
         object_already_present != None and
@@ -532,13 +530,6 @@ async def check_if_stone_present_or_transferred(
         )
         logger.info(f'Stone removed at {detection_time-timedelta(minutes=1)}, event created: {event.__dict__}')
         object_already_present = False
-
-        if cfg.send_json:
-            json = await Event.convert_event_to_json(
-                db_session=db_session,
-                event=event,
-            )
-            await send_event_json(frame=frame, data=json, detection_time=detection_time)
     # endregion
 
     detected_class_ids.clear()
@@ -549,7 +540,7 @@ async def check_if_stone_present_or_transferred(
     if len(object_history) > curr_fps * cfg.stone_history_threshold:
         object_history.clear()
 
-    return object_already_present, object_history
+    return object_already_present, object_history, event
 
 
 async def get_stone_area(
@@ -591,23 +582,6 @@ async def get_stone_area(
         else:
             stone_area = np.average(stone_area_list)
             logger.debug(f'Average stone area: {stone_area}')
-
-            # create event
-            event = await Event.event_create(
-                db_session=db_session,
-                type_id=5,  # rm hardcoded id
-                camera_id=camera_id,
-                time=detection_time,
-                comment=f'{stone_area} cm2'
-            )
-            logger.info(f'Stone area calculated ({stone_area}) at {detection_time}')
-
-            if cfg.send_json:
-                json = await Event.convert_event_to_json(
-                    db_session=db_session,
-                    event=event,
-                )
-                await send_event_json(frame=frame, data=json, detection_time=detection_time)
     
     return stone_area, stone_area_list
 

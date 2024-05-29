@@ -101,7 +101,7 @@ async def download_files(
     date_folder_name = f"{data['startTime'][:10]}"  # redo
     file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
 
-    reg_path = f'static/{date_folder_name}'
+    reg_path = f'{cfg.download_dir}/{date_folder_name}'
 
     if not os.path.exists(reg_path):
         os.makedirs(reg_path, exist_ok=True)

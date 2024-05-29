@@ -5,6 +5,7 @@ CREATE TABLE events (
     time TIMESTAMP,
     machine VARCHAR(255),
     stone_number INT,
+    stone_area VARCHAR(255),
     comment VARCHAR(255),
     deleted BOOLEAN DEFAULT FALSE
 );

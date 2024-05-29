@@ -1,6 +1,8 @@
 import os
+import re
 import cv2
 import uuid
+import json
 import httpx
 import numpy as np
 from datetime import datetime
@@ -46,6 +48,27 @@ def extract_frame(
             break
         if frame_idx % frame_interval == 0:
             frame_count += 1
+
+            # adjust contrast
+            brightness = 0
+            contrast = 1.2
+            frame = cv2.addWeighted(frame, contrast, np.zeros(frame.shape, frame.dtype), 0, brightness)
+
+            # # Sharpen the image 
+            # kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+            # frame = cv2.filter2D(frame, -1, kernel)
+
+            # # adjust color
+            # # Convert the image from BGR to HSV color space 
+            # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV) 
+            # # Adjusts the hue by multiplying it by 0.7 
+            # frame[:, :, 0] = frame[:, :, 0] * 1
+            # # Adjusts the saturation by multiplying it by 1.5 
+            # frame[:, :, 1] = frame[:, :, 1] * 1.5  # ! 1.5
+            # # Adjusts the value by multiplying it by 0.5 
+            # frame[:, :, 2] = frame[:, :, 2] * 1
+            # # Convert the image back to BGR color space 
+            # frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR) 
 
             # scale_factor = 0.5
             # frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor)
@@ -156,28 +179,69 @@ def xml_helper(
     return xml_string
 
 
-async def send_event_json(
+async def save_frame_img(
+    frame: np.ndarray,
+    detection_time: datetime
+) -> str:
+    """
+    Сохранение кадра в файл (изображение)
+
+    Args:
+        frame (np.ndarray): кадр
+        detection_time (datetime): время обнаружения
+    
+    Returns:
+        filename (str): имя сохраненного файла
+    """
+    filename = f'screenshot_{detection_time.strftime("%m-%d-%Y_%H-%M-%S")}.png'
+    saved_img = cv2.imwrite(filename, frame)
+    logger.debug(f"\n\n\nImage saved: {saved_img} ({filename})\n\n\n")
+    return filename
+
+
+async def send_event_info(
     data: str,
     frame: np.ndarray,
     detection_time: datetime,
-    url: str = cfg.json_url,
+    url_json: str = cfg.json_url,
+    url_img: str = cfg.img_url,
     auth: str = cfg.json_auth_token
 ) -> httpx.Response:
-    headers = {
+    headers_json = {
         "Content-Type": "application/json",
         "Authorization": auth
     }
 
-    filename = f'screenshot_{detection_time.strftime("%m-%d-%Y_%H-%M-%S")}.png'
-    saved_img = cv2.imwrite(filename, frame)
-    logger.debug(f"\n\n\nImage saved: {saved_img} ({filename})\n\n\n")
+    headers_img = {
+        "Authorization": auth
+    }
 
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url=url, headers=headers, content=data, files={'file': open(filename, 'rb')})
+            response = await client.post(url=url_json, headers=headers_json, content=data)
 
             if response.status_code == 200 or response.status_code == 201:
-                logger.info(f'JSON POST request sent successfully. Response: {response.text}')
+                logger.info(f'JSON POST request sent successfully. Response: {response.text}.')
+
+                resp_id = re.search('"id":([0-9]+)', response.text).group(1)
+                logger.debug(f'JSON response ID: {resp_id}')
+
+                filename = await save_frame_img(frame=frame, detection_time=detection_time)
+                data = {
+                    'holderType': 'manufacturingOperation',
+                    'manufacturingOperationId': resp_id
+                }
+                files = {
+                    'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
+                    'formData': (None, json.dumps(data), 'application/json')
+                }
+                r = await client.post(url=url_img, headers=headers_img, files=files)
+
+                if response.status_code == 200 or response.status_code == 201:
+                    logger.info(f'Image POST request sent successfully. Response: {r.text}.')
+                else:
+                    logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
+
             else:
                 logger.error(f'JSON POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 

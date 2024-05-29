@@ -5,6 +5,7 @@ from typing import Optional
 from datetime import datetime
 
 from sqlalchemy import Integer
+from sqlalchemy import Float
 from sqlalchemy import String
 from sqlalchemy import Boolean
 from sqlalchemy import DateTime
@@ -36,6 +37,7 @@ class Event(Base):
 
     machine: Mapped[str] = mapped_column(String, nullable=True)  # station No. as per api
     stone_number: Mapped[int] = mapped_column(Integer, nullable=True)  # stone block No. as per api
+    stone_area: Mapped[str] = mapped_column(String, nullable=True)  # area block No. as per api
     comment: Mapped[str] = mapped_column(String, nullable=True)  # other comment as per api
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
@@ -49,6 +51,7 @@ class Event(Base):
         time: datetime,
         machine: Optional[str] = 'PW1TK 3000',
         stone_number: Optional[int] = 1,
+        stone_area: Optional[str] = '0',
         comment: Optional[str] = 'test'
     ) -> 'Event':
 
@@ -58,6 +61,7 @@ class Event(Base):
             time=time,
             machine=machine,
             stone_number=stone_number,
+            stone_area=stone_area,
             comment=comment
         )
 
@@ -65,6 +69,27 @@ class Event(Base):
         await db_session.commit()
 
         logger.debug(f'Event created: {event.__dict__}')
+
+        return event
+    
+    @staticmethod
+    async def event_update_stone_area(
+        *,
+        db_session: AsyncSession,
+        event_id: int,
+        stone_area: str
+    ) -> str:
+
+        event = await db_session.execute(
+            select(Event).filter(
+                Event.id == event_id
+            )
+        )
+        event = event.scalars().first()
+        event.stone_area = stone_area
+        logger.info(f'Event {event_id} stone area updated: {event.stone_area}')
+
+        await db_session.commit()
 
         return event
     
@@ -84,6 +109,7 @@ class Event(Base):
             "machine": "PW1TK 3000",
             "operation": event_type.name,
             "number": "0",
+            "area": f'{event.stone_area} cm2',  # if event.stone_area else "0",  # check
             "comment": "Тестовый документ"
         }
         event_json = json.dumps(event_dict)

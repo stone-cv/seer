@@ -52,7 +52,8 @@ def extract_frame(
             # adjust contrast
             brightness = 0
             contrast = 1.2
-            frame = cv2.addWeighted(frame, contrast, np.zeros(frame.shape, frame.dtype), 0, brightness)
+            gamma = 3
+            frame = cv2.addWeighted(frame, contrast, np.zeros(frame.shape, frame.dtype), gamma, brightness)
 
             # # Sharpen the image 
             # kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
@@ -128,7 +129,7 @@ async def crop_images_in_folder(
 
 def get_time_from_video_path(
         video_path: str
-) -> (datetime, datetime):
+) -> tuple[datetime, datetime]:
     """
     Функция, позволяющая извлечь из названия видеофайла время начала и
     окончания видеофрагмента (при условии соблюдения конвенций для наименования файлов:
@@ -239,6 +240,8 @@ async def send_event_info(
 
                 if response.status_code == 200 or response.status_code == 201:
                     logger.info(f'Image POST request sent successfully. Response: {r.text}.')
+
+                    os.remove(filename)  # check
                 else:
                     logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 

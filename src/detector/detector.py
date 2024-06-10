@@ -3,9 +3,12 @@ import cv2
 import csv
 import random
 import shutil
-import torch
 import numpy as np
 import supervision as sv
+
+import torch
+from torchvision.transforms import v2
+from PIL import Image
 
 from time import time
 
@@ -45,6 +48,31 @@ class Detector:
         model.fuse()
     
         return model
+    
+    def augment_dataset_dir(self):
+        input_dir = 'datasets/seg/for_augmentation'
+        output_dir = 'datasets/seg/augmented'
+
+        os.makedirs(output_dir, exist_ok=True)
+
+        transform = v2.Compose([
+            v2.ColorJitter(contrast=0.5, brightness=0.5),
+            v2.RandomGrayscale(p=0.5)
+        ])
+
+        for filename in os.listdir(input_dir):
+            if filename.endswith('.jpg') or filename.endswith('.png'):
+                img_path = os.path.join(input_dir, filename)
+                img = Image.open(img_path).convert('RGB')
+
+                augmented_img = transform(img)
+
+                output_path = os.path.join(output_dir, filename)
+                augmented_img.save(output_path)
+
+                logger.debug(f'Processed {filename}')
+
+        print('Data augmentation completed!')
     
 
     def split_dataset(self):

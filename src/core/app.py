@@ -3,9 +3,6 @@ from typing import List
 from datetime import datetime
 from datetime import timedelta
 
-from fastapi import FastAPI
-from fastapi import APIRouter
-
 import core.config as cfg
 from core.logger import logger
 from detector.detector import Detector
@@ -37,67 +34,53 @@ class Application:
         self.stone_area_list: List[float] = []
         self.stone_area: float = 0
         self.event_list: List[Event] = []
-        self.last_video_end: datetime = datetime(2024, 5, 22, 13, 20, 0)
+        self.last_video_end: datetime = datetime.now() - timedelta(hours=2)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
     def start(self):
-        # генерируем воркеров для поиска видео файлов
         for _ in range(1):
             task = asyncio.Task(self.search_for_video_files())
             self.tasks_search_video.append(task)
 
-        # генерируем воркеров для скачивания видео файлов
         for _ in range(1):
             task = asyncio.Task(self.download_video_files())
             self.tasks_download_video.append(task)
 
-        # генерируем воркеров для обработки видео файлов
         for _ in range(1):
             task = asyncio.Task(self.process_video_file())
             self.tasks_process_video.append(task)
 
-        # генерируем таск для получения вставки дат и времени в очередь
         self.task_generate = asyncio.Task(self.generate_datetime_queue(
             start_time=self.last_video_end,
         ))
 
-        # устанавливаем статус апликахе
         self.status = 1
 
     def stop(self):
-        # останавливаем таски поиска видео файлов
         for task in self.tasks_search_video:
             task.cancel()
 
-        # останавливаем таски скачивания видео файлов
         for task in self.tasks_download_video:
             task.cancel()
 
-        # останавливаем таски обработки видео файлов
         for task in self.tasks_process_video:
             task.cancel()
 
-        # отсанавливаем таск для формирования очереди данных
         self.task_generate.cancel()
 
-        # устанавливаем статус аппликахе
         self.status = 0
 
     def restart(self):
-        # останавливаем таски поиска видео файлов
         for task in self.tasks_search_video:
             task.cancel()
 
-        # останавливаем таски скачивания видео файлов
         for task in self.tasks_download_video:
             task.cancel()
 
-        # останавливаем таски обработки видео файлов
         for task in self.tasks_process_video:
             task.cancel()
 
-        # отсанавливаем таск для формирования очереди данных
         self.task_generate.cancel()
         self.queue_search_video: asyncio.Queue = asyncio.Queue()
         self.queue_download_video: asyncio.Queue = asyncio.Queue()
@@ -107,17 +90,14 @@ class Application:
             task = asyncio.Task(self.search_for_video_files())
             self.tasks_search_video.append(task)
 
-        # генерируем воркеров для скачивания видео файлов
         for _ in range(1):
             task = asyncio.Task(self.download_video_files())
             self.tasks_download_video.append(task)
 
-        # генерируем воркеров для обработки видео файлов
         for _ in range(1):
             task = asyncio.Task(self.process_video_file())
             self.tasks_process_video.append(task)
 
-        # генерируем таск для получения вставки дат и времени в очередь
         self.task_generate = asyncio.Task(self.generate_datetime_queue(
             start_time=self.last_video_end
         ))
@@ -130,6 +110,9 @@ class Application:
         start_time = start_time
         end_time = datetime.now()
         logger.debug(f'start_time: {start_time}; end_time: {end_time}')
+
+        # cfg['Application'].update({'processing_stopped_at':start_time})
+        # print(cfg.processing_stopped_at)
 
         await self.queue_search_video.put((start_time, end_time))
         

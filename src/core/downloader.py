@@ -43,51 +43,72 @@ async def get_files_list(
 
     files_dict = {}
 
+    retry_count = 0
+    success = False
+
     search_url = 'ContentMgmt/search'
     api_url = f'http://{recorder_ip}/ISAPI/{search_url}'
 
-    # перевод xml в json
     async with httpx.AsyncClient() as client:
-        response = await client.post(
-            api_url,
-            auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
-            content=xml_helper(start_time, end_time, channel),
-            timeout=30
-        )
-        logger.debug(response)
+        while retry_count <= 10 and not success:
+            try:
+                # перевод xml в json
+                response = await client.post(
+                    api_url,
+                    auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
+                    content=xml_helper(start_time, end_time, channel),
+                    timeout=30
+                )
+                logger.debug(response)
 
-    # TODO: Add 401 response handle
-    root = etree.fromstring(response.text.replace('<?xml version="1.0" encoding="UTF-8" ?>\n', ''))
-    logger.debug(root)
-    items = []
+                if response.status_code != 200:
+                    retry_count += 1
+                    logger.error(f'Videofile retrieval task error: response status code {response.status_code}; retry count: {retry_count}.')
+                    await asyncio.sleep(5)
+                    continue
 
-    if len(root.getchildren()) > 4:
-        video_list = root.getchildren()[4].getchildren()[:-1]  # the last file is still being recorded
-        for match in video_list:
-            data = {}
-            for el in match.getchildren():
-                del_url = [
-                    '{http://www.hikvision.com/ver20/XMLSchema}',
-                    '{http://www.std-cgi.com/ver20/XMLSchema}',
-                    '{http://www.isapi.org/ver20/XMLSchema}',
-                ]
+                success = True
 
-                for url in del_url:
-                    if el.text != '\n':
-                        dict_key = el.tag.replace(url, '') if url in el.tag else el.tag
-                        data[dict_key] = el.text
-                    else:
-                        for el_ch in el.getchildren():
-                            dict_key = el_ch.tag.replace(url, '')if url in el_ch.tag else el_ch.tag
-                            data[dict_key] = el_ch.text
-            if data['startTime'] == data['endTime']:
-                continue
-            items.append(data)
+            # except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
+            except Exception as exc:
+                retry_count += 1
+                logger.error(f"Videofile retrieval task error, retry count: {retry_count}\n{exc} {traceback.format_exc()}")
+                    
+            await asyncio.sleep(5)
+    
+    if success:
+        # TODO: Add 401 response handle
+        root = etree.fromstring(response.text.replace('<?xml version="1.0" encoding="UTF-8" ?>\n', ''))
+        logger.debug(root)
+        items = []
 
-    files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
-    logger.debug(f'{len(files_dict[channel])} file(s) retrieved for download: {files_dict}')
+        if len(root.getchildren()) > 4:
+            video_list = root.getchildren()[4].getchildren()[:-1]  # the last file is still being recorded
+            for match in video_list:
+                data = {}
+                for el in match.getchildren():
+                    del_url = [
+                        '{http://www.hikvision.com/ver20/XMLSchema}',
+                        '{http://www.std-cgi.com/ver20/XMLSchema}',
+                        '{http://www.isapi.org/ver20/XMLSchema}',
+                    ]
 
-    return files_dict
+                    for url in del_url:
+                        if el.text != '\n':
+                            dict_key = el.tag.replace(url, '') if url in el.tag else el.tag
+                            data[dict_key] = el.text
+                        else:
+                            for el_ch in el.getchildren():
+                                dict_key = el_ch.tag.replace(url, '')if url in el_ch.tag else el_ch.tag
+                                data[dict_key] = el_ch.text
+                if data['startTime'] == data['endTime']:
+                    continue
+                items.append(data)
+
+        files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
+        logger.debug(f'{len(files_dict[channel])} file(s) retrieved for download: {files_dict}')
+
+        return files_dict
 
 
 async def download_files(

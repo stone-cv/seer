@@ -53,6 +53,8 @@ async def main():
     # )
     # logger.info(f'Training complete')
 
+    # detector.augment_dataset_dir()
+
     """ process video & detect objects """
 
     # region segmentation

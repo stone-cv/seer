@@ -1,4 +1,5 @@
 import cv2
+import asyncio
 import numpy as np
 
 from typing import List
@@ -120,16 +121,14 @@ async def process_video_file(
                         object_already_present=stone_already_present,
                         forklift_id=2,  # forklift class id
                         forklift_history=forklift_history,
+                        saw_already_moving=saw_already_moving,
                         curr_fps=curr_fps,
                         detection_time=detection_time,
                         camera_id=camera_id,
                         frame=frame
                     )
-                    if stone_event and stone_event.type_id != 2:
+                    if stone_event:  #and stone_event.type_id != 2:
                         event_list.append(stone_event)
-
-                    # TODO: return event -> calculate area -> modify event with area -> send POST request
-                    # TODO: check event type -> if 2 (stone removed) area = 0
 
                     if len(event_list) > 0:
                         logger.debug(f'Event list: {event_list}')
@@ -149,25 +148,40 @@ async def process_video_file(
                         )
 
                         logger.debug(f'Stone area: {stone_area}')
-                        if stone_area > 0:
+
+                        if stone_area > 0:  # or not stone_already_present:
+                            if stone_area < 1:
+                                stone_area = 'not found'
+
                             for event in event_list:
-                                logger.debug(f'Event: {event.__dict__}')
+                                try:
+                                    logger.debug(f'Event: {event.__dict__}')
 
-                                event = await Event.event_update_stone_area(
-                                    db_session=session,
-                                    event_id=event.id,
-                                    stone_area=str(stone_area)
-                                )
-
-                                if cfg.send_json:
-                                    json = await Event.convert_event_to_json(
+                                    event = await Event.event_update_stone_area(
                                         db_session=session,
-                                        event=event,
+                                        event_id=event.id,
+                                        stone_area=str(stone_area)
                                     )
-                                    print(f'\n\n\n{json}\n\n\n')
-                                    await send_event_info(frame=frame, data=json,detection_time=detection_time)
+                                    await asyncio.sleep(0.5)
+                                    print(event.__dict__)
 
-                                    event_list.remove(event)
+                                    if cfg.send_json:
+                                        json = await Event.convert_event_to_json(
+                                            db_session=session,
+                                            event=event,
+                                        )
+                                        logger.debug(f'JSON:{json}')
+                                        # await send_event_info(frame=frame, data=json,detection_time=detection_time)
+
+                                        event_list.remove(event)
+
+                                        # сбрасываем площадь камня
+                                        stone_area = 0
+                                    stone_area_list.clear()
+
+                                except Exception as exc:
+                                    logger.error(exc)
+                                    continue
 
                 logger.debug(f'results: {frame_pred}')
                 # all_results[frame_idx] = frame_pred
@@ -407,6 +421,7 @@ async def check_if_stone_present_or_transferred(
         object_history: List[bool],
         object_already_present: bool,
         forklift_history: List[bool],
+        saw_already_moving: bool,
         curr_fps: int,
         detection_time: datetime,
         camera_id: int,
@@ -459,6 +474,7 @@ async def check_if_stone_present_or_transferred(
         if len(forklift_history) >= curr_fps * cfg.forklift_present_threshold:
 
             if (
+                not saw_already_moving and
                 forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
                 not object_already_present and
                 object_history.count(False) > len(object_history) * cfg.majority_threshold and
@@ -480,6 +496,7 @@ async def check_if_stone_present_or_transferred(
                 # object_history.clear()
             
             elif (
+                not saw_already_moving and
                 forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
                 object_already_present and
                 object_history.count(True) > len(object_history) * cfg.majority_threshold and
@@ -557,31 +574,39 @@ async def get_stone_area(
     detection_time: datetime
 ):
     # если каменя нет или он пропал, то обнуляем площадь и не вычисляем, пока не появится
-    if not stone_already_present:
-        stone_area = 0
+    # if not stone_already_present:
+    #     stone_area = 0
+    #     stone_area_list.clear()
+
+    # if (
+    #     stone_area == 0 and
+    #     stone_already_present
+    #     # not saw_already_moving
+    #     # 0 in class_ids and  # stone class id
+    #     # 2 not in class_ids and  # forklift class id
+    #     # all(obj_present_result for obj_present_result in stone_history[-(curr_fps * 10):])
+    # ):
+    if len(stone_area_list) < cfg.max_stone_area_list:
+        seg_results = seg_detector.model(source=frame)
+        if seg_results[0].masks:  # check if there are masks
+            segment = seg_detector.parse_segmentation(seg_results)
+            seg_detector.plot_segmentation(segment, frame)
+
+            stone_area_prelim = calculate_segment_area(segment)
+            if stone_area_prelim > 0:
+                stone_area_list.append(stone_area_prelim)
+        else:
+            stone_area_list.append(0.1)  # check for no seg detection
+
+    else:
+        stone_area = round(np.average(stone_area_list))
+        logger.debug(f'Average stone area: {stone_area}')
+
         stone_area_list.clear()
 
-    if (
-        stone_area == 0 and
-        stone_already_present
-        # not saw_already_moving
-        # 0 in class_ids and  # stone class id
-        # 2 not in class_ids and  # forklift class id
-        # all(obj_present_result for obj_present_result in stone_history[-(curr_fps * 10):])
-    ):
-        if len(stone_area_list) < cfg.max_stone_area_list:
-            seg_results = seg_detector.model(source=frame)
-            if seg_results[0].masks:  # check if there are masks
-                segment = seg_detector.parse_segmentation(seg_results)
-                # seg_detector.plot_segmentation(segment, frame)
-
-                stone_area_prelim = calculate_segment_area(segment)
-                if stone_area_prelim > 0:
-                    stone_area_list.append(stone_area_prelim)
-
-        else:
-            stone_area = np.average(stone_area_list)
-            logger.debug(f'Average stone area: {stone_area}')
+        # if stone_area < 1:  # check for no seg detection
+        #     logger.info(f'Stone area too small: {stone_area}')
+        #     stone_area = 'not found'
     
     return stone_area, stone_area_list
 

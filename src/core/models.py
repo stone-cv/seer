@@ -51,7 +51,7 @@ class Event(Base):
         time: datetime,
         machine: Optional[str] = 'PW1TK 3000',
         stone_number: Optional[int] = 1,
-        stone_area: Optional[str] = '0',
+        stone_area: Optional[str] = 0,
         comment: Optional[str] = 'test'
     ) -> 'Event':
 
@@ -103,6 +103,9 @@ class Event(Base):
             db_session=db_session,
             type_id=event.type_id
         )
+
+        if not event.stone_area:
+            event.stone_area = '0'
 
         event_dict = {
             "date": event.time.strftime('%Y-%m-%d %H:%M'),

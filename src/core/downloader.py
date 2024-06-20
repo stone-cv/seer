@@ -74,7 +74,7 @@ async def get_files_list(
                 retry_count += 1
                 logger.error(f"Videofile retrieval task error, retry count: {retry_count}\n{exc} {traceback.format_exc()}")
                     
-            await asyncio.sleep(5)
+                await asyncio.sleep(5)
     
     if success:
         # TODO: Add 401 response handle

@@ -149,8 +149,8 @@ async def process_video_file(
 
                         logger.debug(f'Stone area: {stone_area}')
 
-                        if stone_area > 0:  # or not stone_already_present:
-                            if stone_area < 1:
+                        if stone_area > 0:
+                            if stone_area < 1:  # or not stone_already_present:
                                 stone_area = 'not found'
 
                             for event in event_list:
@@ -162,7 +162,7 @@ async def process_video_file(
                                         event_id=event.id,
                                         stone_area=str(stone_area)
                                     )
-                                    await asyncio.sleep(0.5)
+                                    # await asyncio.sleep(1)
                                     print(event.__dict__)
 
                                     if cfg.send_json:
@@ -173,15 +173,17 @@ async def process_video_file(
                                         logger.debug(f'JSON:{json}')
                                         # await send_event_info(frame=frame, data=json,detection_time=detection_time)
 
-                                        event_list.remove(event)
-
-                                        # сбрасываем площадь камня
-                                        stone_area = 0
-                                    stone_area_list.clear()
+                                        # event_list.remove(event)
 
                                 except Exception as exc:
                                     logger.error(exc)
-                                    continue
+                                    # event_list.remove(event)  # ?
+                                    # continue
+                                    break
+
+                            # сбрасываем площадь камня
+                            stone_area = 0
+                            event_list.clear()  # ?
 
                 logger.debug(f'results: {frame_pred}')
                 # all_results[frame_idx] = frame_pred
@@ -586,11 +588,19 @@ async def get_stone_area(
     #     # 2 not in class_ids and  # forklift class id
     #     # all(obj_present_result for obj_present_result in stone_history[-(curr_fps * 10):])
     # ):
+    logger.debug(f'Stone list: {stone_area_list}')
+
     if len(stone_area_list) < cfg.max_stone_area_list:
         seg_results = seg_detector.model(source=frame)
-        if seg_results[0].masks:  # check if there are masks
+        if seg_results and seg_results[0].masks:  # check if there are masks
             segment = seg_detector.parse_segmentation(seg_results)
-            seg_detector.plot_segmentation(segment, frame)
+
+            # item_in_roi = await is_in_roi(
+            #                 roi_xyxy=camera_roi,
+            #                 object_xyxy=item['xyxy']
+            #             )
+            # if item_in_roi:
+            seg_detector.plot_segmentation(segment, frame, detection_time)
 
             stone_area_prelim = calculate_segment_area(segment)
             if stone_area_prelim > 0:
@@ -599,7 +609,7 @@ async def get_stone_area(
             stone_area_list.append(0.1)  # check for no seg detection
 
     else:
-        stone_area = round(np.average(stone_area_list))
+        stone_area = round(np.average(stone_area_list), 1)
         logger.debug(f'Average stone area: {stone_area}')
 
         stone_area_list.clear()

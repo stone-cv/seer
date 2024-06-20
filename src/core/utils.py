@@ -4,6 +4,7 @@ import cv2
 import uuid
 import json
 import httpx
+import traceback
 import numpy as np
 from datetime import datetime
 from typing import Any
@@ -219,37 +220,39 @@ async def send_event_info(
 
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url=url_json, headers=headers_json, content=data)
+            timeout = httpx.Timeout(10.0, read=None)
+            print('JSON POST request sent...')
+            response = await client.post(url=url_json, headers=headers_json, content=data, timeout=timeout)
 
             if response.status_code == 200 or response.status_code == 201:
                 logger.info(f'JSON POST request sent successfully. Response: {response.text}.')
 
-                resp_id = re.search('"id":([0-9]+)', response.text).group(1)
-                logger.debug(f'JSON response ID: {resp_id}')
+                # resp_id = re.search('"id":([0-9]+)', response.text).group(1)
+                # logger.debug(f'JSON response ID: {resp_id}')
 
-                filename = await save_frame_img(frame=frame, detection_time=detection_time)
-                data = {
-                    'holderType': 'manufacturingOperation',
-                    'manufacturingOperationId': resp_id
-                }
-                files = {
-                    'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
-                    'formData': (None, json.dumps(data), 'application/json')
-                }
-                r = await client.post(url=url_img, headers=headers_img, files=files)
+                # filename = await save_frame_img(frame=frame, detection_time=detection_time)
+                # data = {
+                #     'holderType': 'manufacturingOperation',
+                #     'manufacturingOperationId': resp_id
+                # }
+                # files = {
+                #     'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
+                #     'formData': (None, json.dumps(data), 'application/json')
+                # }
+                # r = await client.post(url=url_img, headers=headers_img, files=files)
 
-                if response.status_code == 200 or response.status_code == 201:
-                    logger.info(f'Image POST request sent successfully. Response: {r.text}.')
+                # if response.status_code == 200 or response.status_code == 201:
+                #     logger.info(f'Image POST request sent successfully. Response: {r.text}.')
 
-                    os.remove(filename)  # check
-                else:
-                    logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
+                #     os.remove(filename)  # check
+                # else:
+                #     logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 
             else:
                 logger.error(f'JSON POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 
     except Exception as exc:
-        logger.error(exc)
+        logger.error(f'{exc} {traceback.format_exc()}')
 
     # return response
 
@@ -273,7 +276,7 @@ if __name__ == '__main__':
 
     drawing = False
     roi_points = []
-    frame = "../static/1.png"
+    frame = "video/1.png"
 
     frame = cv2.imread(frame)
 

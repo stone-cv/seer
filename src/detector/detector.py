@@ -3,6 +3,7 @@ import cv2
 import csv
 import random
 import shutil
+import traceback
 import numpy as np
 import supervision as sv
 
@@ -180,12 +181,17 @@ class Detector:
             for result in results:
                 boxes = result.boxes.cpu().numpy()
 
-                if boxes.cls.size > 0:  # and boxes.cls.any()
+                if boxes.cls.size > 0:
                     class_id = boxes.cls[0].astype(int)
                     conf = boxes.conf[0].astype(float)
                     xyxy = boxes.xyxy[0].tolist()
                     xywh = boxes.xywh[0].tolist()
-                    track_id = boxes.id[0].astype(int)
+
+                    if boxes.id:
+                        track_id = boxes.id[0].astype(int)
+                    else:
+                        track_id = 0
+                    
                     logger.debug(f'class_id: {class_id}, track_id: {track_id}, conf: {conf}, xyxy: {xyxy}')
 
                     prediction = {
@@ -207,7 +213,7 @@ class Detector:
                     # detections = np.empty((0, 5))  # for tracker
 
         except Exception as e:
-            logger.error(e)
+            logger.error(f'{e} {traceback.format_exc()}')
         
         return frame_pred  # detections
     
@@ -223,11 +229,11 @@ class Detector:
             return mask_np
         
     
-    def plot_segmentation(self, segment, image):
-        # image = cv2.imread(image)
+    def plot_segmentation(self, segment, image, detection_time):
+        # image_open = cv2.imread(image)
 
         # draw contour
-        cv2.polylines(image, segment, True, (255, 0, 0), 1)
+        plotted_img = cv2.polylines(image, segment, True, (255, 0, 0), 1)
 
         # draw mask
         # mask_img = np.zeros_like(img)
@@ -236,11 +242,12 @@ class Detector:
 
         # cv2.fillPoly(img_open, segment, colors[color_number])  # crashes
 
-        cv2.imshow("Image", image)
-        cv2.waitKey(0)
-        # cv2.imwrite(f"{cfg.results_dir}/{img_open}", img_open)
+        # cv2.imshow("Image", image)
+        # cv2.waitKey(0)
+        filename = f"area_plotting/{detection_time.strftime('%m-%d-%Y_%H-%M-%S')}.png"
+        cv2.imwrite(filename, plotted_img)
 
-        return image
+        return plotted_img
 
 
     def save_detections_to_csv(self, results_dict, video_path, video_fps):

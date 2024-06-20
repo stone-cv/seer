@@ -51,7 +51,7 @@ class Event(Base):
         time: datetime,
         machine: Optional[str] = 'PW1TK 3000',
         stone_number: Optional[int] = 1,
-        stone_area: Optional[str] = 0,
+        stone_area: Optional[str] = '0',
         comment: Optional[str] = 'test'
     ) -> 'Event':
 

@@ -108,7 +108,7 @@ class Event(Base):
             event.stone_area = '0'
 
         event_dict = {
-            "date": event.time.strftime('%Y-%m-%d %H:%M'),
+            "date": event.time.strftime('%Y-%m-%d %H:%M:%S'),
             "machine": "PW1TK 3000",
             "operation": event_type.name,
             "number": "0",

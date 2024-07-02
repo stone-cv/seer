@@ -151,7 +151,7 @@ async def process_video_file(
 
                         if stone_area > 0:
                             if stone_area < 1:  # or not stone_already_present:
-                                stone_area = 'not found'
+                                stone_area = 0
 
                             for event in event_list:
                                 try:
@@ -170,7 +170,7 @@ async def process_video_file(
                                             db_session=session,
                                             event=event,
                                         )
-                                        logger.debug(f'JSON:{json}')
+                                        logger.info(f'JSON:{json}')
                                         # await send_event_info(frame=frame, data=json,detection_time=detection_time)
 
                                         # event_list.remove(event)

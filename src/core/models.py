@@ -105,15 +105,15 @@ class Event(Base):
         )
 
         if not event.stone_area:
-            event.stone_area = '0'
+            event.stone_area = 0
 
         event_dict = {
             "date": event.time.strftime('%Y-%m-%d %H:%M:%S'),
             "machine": "PW1TK 3000",
             "operation": event_type.name,
             "number": "0",
-            "area": f'{event.stone_area} cm2',  # if event.stone_area else "0",  # check
-            "comment": "Тестовый документ"
+            "area": float(event.stone_area),  # if event.stone_area else "0",  # check
+            "comment": "площадь в см2"
         }
         event_json = json.dumps(event_dict)
         return event_json

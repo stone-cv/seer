@@ -38,7 +38,7 @@ class Application:
         self.stone_area_list: List[float] = []
         self.stone_area: float = 0
         self.event_list: List[Event] = []
-        self.last_video_end: datetime = datetime.now() - timedelta(hours=14)
+        self.last_video_end: datetime = datetime.now() - timedelta(hours=15)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 
@@ -231,6 +231,8 @@ class Application:
                     )
 
                 await self.queue_process_video.put((filepath, video_file.id))
+                logger.debug(f'{self.queue_process_video.qsize()} files in the queue')
+
                 self.queue_download_video.task_done()
     
     async def process_video_file(self):
@@ -239,10 +241,11 @@ class Application:
         """
         while True:
             filepath, file_id = await self.queue_process_video.get()
+            logger.debug(f'File {file_id} ({filepath}) is being processed')
             try:
                 det_start = datetime.now()
-                logger.debug(f'File {file_id} is being processed')
-                
+                logger.debug(f'File {file_id} det_start: {det_start}')
+
                 self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
                     detector=self.detector,
                     seg_detector=self.detector_seg,
@@ -255,7 +258,7 @@ class Application:
                     event_list=self.event_list,
                     stone_area = self.stone_area
                 )
-                logger.debug(f'File {file_id} processed')
+                logger.debug(f'File {file_id} det_end: {datetime.now()}')
 
                 async with SessionLocal() as session:
                     await VideoFile.update(

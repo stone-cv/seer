@@ -170,7 +170,6 @@ class Application:
                                 param_name='playback_uri',
                                 param_val=item['playbackURI']
                             )
-                            logger.debug(f'Video file found in DB: {video_file.__dict__}')
 
                             if not video_file:
                                 video_file = await VideoFile.create(

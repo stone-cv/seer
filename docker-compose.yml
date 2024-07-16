@@ -1,5 +1,3 @@
-# version: "3"
-
 services:
   db:
     image: postgres:11
@@ -7,7 +5,9 @@ services:
       - "5432:5432"
     volumes:
       - ./src/core/init.sql:/docker-entrypoint-initdb.d/init.sql
-    env_file: 
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
+    env_file:
       - .env
     restart: unless-stopped
 
@@ -16,5 +16,18 @@ services:
     command: python ./src/main.py
     volumes:
       - .:/code
+      - /etc/timezone:/etc/timezone:ro
+      - /etc/localtime:/etc/localtime:ro
     depends_on:
       - db
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities:
+                - gpu
+                  #- utility # nvidia-smi
+                  #- compute # CUDA
+                  #- video   # NVDEC/NVENC/NVCUVID

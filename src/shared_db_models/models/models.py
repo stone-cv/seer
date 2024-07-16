@@ -15,8 +15,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import shared_db_models.config as db_cfg
-from shared_db_models.logger import logger
+import src.core.config as cfg
+from src.core.logger import logger
 from shared_db_models.database import Base
 from shared_db_models.models.base_model import BaseCRUD
 
@@ -120,7 +120,7 @@ class Camera(Base):
             if match:
                 login = match.group(1)
                 password = match.group(2)
-                camera_url = camera_url.replace(f'{login}:{password}', f'{db_cfg.cam_login}:{db_cfg.cam_password}')
+                camera_url = camera_url.replace(f'{login}:{password}', f'{cfg.cam_login}:{cfg.cam_password}')
             else:
                 logger.error(f'Invalid url for camera {camera_id}: {camera_url}\n{exc}')
     
@@ -173,17 +173,18 @@ class Event(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
 
-    type_id: Mapped[int] = mapped_column(ForeignKey("event_types.id"))  # 'operation' as per api
-    event_type: Mapped['EventType'] = relationship(back_populates="event")  # ?
+    type_id: Mapped[int] = mapped_column(ForeignKey("event_types.id"))
+    event_type: Mapped['EventType'] = relationship(back_populates="event")
 
     camera_id: Mapped[int] = mapped_column(ForeignKey("cameras.id"))
     camera: Mapped['Camera'] = relationship(back_populates="event")
 
-    time: Mapped[DateTime] = mapped_column(DateTime)  # timestamp? 'date' as per api
+    time: Mapped[DateTime] = mapped_column(DateTime)
 
-    machine: Mapped[str] = mapped_column(String, nullable=True)  # station No. as per api
-    stone_number: Mapped[int] = mapped_column(Integer, nullable=True)  # stone block No. as per api
-    comment: Mapped[str] = mapped_column(String, nullable=True)  # other comment as per api
+    machine: Mapped[str] = mapped_column(String, nullable=True)
+    stone_number: Mapped[int] = mapped_column(Integer, nullable=True)
+    stone_area: Mapped[str] = mapped_column(String, nullable=True)
+    comment: Mapped[str] = mapped_column(String, nullable=True)
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -196,7 +197,8 @@ class Event(Base):
         time: datetime,
         machine: Optional[str] = 'PW1TK 3000',
         stone_number: Optional[int] = 1,
-        comment: Optional[str] = 'test'
+        stone_area: Optional[str] = '0',
+        comment: Optional[str] = 'см2'
     ) -> 'Event':
 
         event = Event(
@@ -205,6 +207,7 @@ class Event(Base):
             time=time,
             machine=machine,
             stone_number=stone_number,
+            stone_area=stone_area,
             comment=comment
         )
 
@@ -216,24 +219,51 @@ class Event(Base):
         return event
     
     @staticmethod
+    async def event_update_stone_area(
+        *,
+        db_session: AsyncSession,
+        event_id: int,
+        stone_area: str
+    ) -> str:
+
+        event = await db_session.execute(
+            select(Event).filter(
+                Event.id == event_id
+            )
+        )
+        event = event.scalars().first()
+        event.stone_area = stone_area
+        logger.info(f'Event {event_id} stone area updated: {event.stone_area}')
+
+        await db_session.commit()
+
+        return event
+    
+    @staticmethod
     async def convert_event_to_json(
         *,
         db_session: AsyncSession,
         event: 'Event'
     ):
+
         event_type = await EventType.get_type_by_id(
             db_session=db_session,
             type_id=event.type_id
         )
 
+        if not event.stone_area:
+            event.stone_area = 0
+
         event_dict = {
-            "date": event.time.strftime('%Y-%m-%d %H:%M'),
+            "date": event.time.strftime('%Y-%m-%d %H:%M:%S'),
             "machine": "PW1TK 3000",
             "operation": event_type.name,
             "number": "0",
-            "comment": "Тестовый документ"
+            "area": float(event.stone_area),
+            "comment": "площадь в см2"
         }
         event_json = json.dumps(event_dict)
+
         return event_json
 
     @staticmethod

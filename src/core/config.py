@@ -30,7 +30,7 @@ weights_det = config['Application']['weights_det']
 weights_seg = config['Application']['weights_seg']
 deep_archive = config['Application']['deep_archive']
 delay = config['Application']['delay']
-processing_stopped_at = config['Application']['processing_stopped_at']
+# processing_stopped_at = config['Application']['processing_stopped_at']
 
 send_json = config['Application']['send_json']
 json_url = config['Application']['json_url']

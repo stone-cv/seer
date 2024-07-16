@@ -17,8 +17,8 @@ from ultralytics import YOLO
 from clearml import Task
 from sklearn.model_selection import train_test_split
 
-import core.config as cfg
-from core.logger import logger
+import src.core.config as cfg
+from src.core.logger import logger
 
 
 class Detector:

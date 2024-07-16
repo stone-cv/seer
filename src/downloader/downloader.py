@@ -10,9 +10,11 @@ from tqdm import tqdm
 from lxml import etree
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-import core.config as cfg
-from core.logger import logger
-from core.utils import xml_helper
+import src.core.config as cfg
+from src.core.logger import logger
+from src.core.utils import xml_helper
+from shared_db_models.database import SessionLocal
+from shared_db_models.models.models import VideoFile
 
 
 # start_time = datetime.fromisoformat("2024-02-06T16:00:00Z".replace("Z", "+00:00"))
@@ -129,6 +131,14 @@ async def download_files(
 
     data_filepath = os.path.join(reg_path, file_name)
 
+    async with SessionLocal() as session:  # close session?
+        await VideoFile.update(
+            db_session=session,
+            id=data.id,
+            path=data_filepath,
+            download_start=datetime.now()
+        )
+
     # Начинаем загрузку файлов
     api_url = f'http://{recorder_ip}/ISAPI/'
     download_url = api_url + 'ContentMgmt/download'
@@ -189,7 +199,15 @@ async def download_files(
             await asyncio.sleep(5)
     
     if success:
-        return data_filepath
+
+        videofile = await VideoFile.update(
+                db_session=session,
+                id=data.id,
+                download_end=datetime.now(),
+                is_downloaded=True
+            )
+
+        return videofile
 
 
 # if __name__ == "__main__":

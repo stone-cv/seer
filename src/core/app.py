@@ -3,14 +3,17 @@ from typing import List
 from datetime import datetime
 from datetime import timedelta
 
-import core.config as cfg
-from core.logger import logger
-from detector.detector import Detector
-from core.downloader import get_files_list
-from core.downloader import download_files
-from core.scenarios import process_video_file
-from core.utils import get_time_from_video_path
-from core.models import Event
+import src.core.config as cfg
+from src.core.logger import logger
+from src.core.utils import get_time_from_video_path
+from detection.detector.detector import Detector
+from detection.services import process_video_file
+from downloader.downloader import get_files_list
+from downloader.downloader import download_files
+from shared_db_models.database import SessionLocal
+from shared_db_models.models.models import Event
+from shared_db_models.models.models import Camera
+from shared_db_models.models.models import VideoFile
 
 
 class Application:
@@ -19,6 +22,7 @@ class Application:
         self.detector: Detector = Detector(capture_index=0, mode='det')
         self.detector_seg: Detector = Detector(capture_index=0, mode='seg')
         self.camera_id: int = cfg.camera_id
+        self.cam_track_id: int = None  # !!!!!
         self.queue_search_video: asyncio.Queue = asyncio.Queue()
         self.queue_download_video: asyncio.Queue = asyncio.Queue()
         self.queue_process_video: asyncio.Queue = asyncio.Queue()
@@ -125,36 +129,59 @@ class Application:
         while True:
             start_time, end_time = await self.queue_search_video.get()
             try:
-                files_dict = await get_files_list(
-                    channel=cfg.channel,
-                    recorder_ip=cfg.recorder_ip,
-                    start_time=start_time,
-                    end_time=end_time
-                )
+                async with SessionLocal() as session:
+                    if not self.cam_track_id:
+                        self.cam_track_id = await Camera.get_track_id_by_camera_id(
+                            db_session=session,
+                            camera_id=self.camera_id
+                        )
 
-                if len(files_dict[cfg.channel]) == 0:  # redo
-                    logger.info(f"Files not found from {start_time} to {end_time}. Retrying in 60 seconds...")
-                    await asyncio.sleep(60)
-                    await self.generate_datetime_queue(
-                        start_time=self.last_video_end
+                    files_dict = await get_files_list(
+                        channel=cfg.channel,
+                        recorder_ip=cfg.recorder_ip,
+                        start_time=start_time,
+                        end_time=end_time
                     )
-                
-                # check if we have already downloaded the file for this time period
-                for item in files_dict[cfg.channel]:  # redo
-                    vid_start = datetime.strptime(item['startTime'], "%Y-%m-%dT%H:%M:%SZ")
-                    vid_end = datetime.strptime(item['endTime'], "%Y-%m-%dT%H:%M:%SZ")
-                    if vid_start < self.last_video_end:
-                        if len(files_dict[cfg.channel]) > 1:
-                            continue
-                        logger.info(f"Video starts ({vid_start}) earlier than the last video ends ({self.last_video_end}). Retrying in 60 seconds...")
+
+                    if len(files_dict[cfg.channel]) == 0:  # redo
+                        logger.info(f"Files not found from {start_time} to {end_time}. Retrying in 60 seconds...")
                         await asyncio.sleep(60)
                         await self.generate_datetime_queue(
                             start_time=self.last_video_end
                         )
-                    else:
-                        logger.info(f"Successfully retrived video (start: {vid_start}, end: {vid_end})")
-                        await self.queue_download_video.put(item)
-                        break  # redo
+                    
+                    # check if we have already downloaded the file for this time period
+                    for item in files_dict[cfg.channel]:  # redo
+                        vid_start = datetime.strptime(item['startTime'], "%Y-%m-%dT%H:%M:%SZ")
+                        vid_end = datetime.strptime(item['endTime'], "%Y-%m-%dT%H:%M:%SZ")
+                        if vid_start < self.last_video_end:
+                            if len(files_dict[cfg.channel]) > 1:
+                                continue
+                            logger.info(f"Video starts ({vid_start}) earlier than the last video ends ({self.last_video_end}). Retrying in 60 seconds...")
+                            await asyncio.sleep(60)
+                            await self.generate_datetime_queue(
+                                start_time=self.last_video_end
+                            )
+                        else:
+                            logger.info(f"Successfully retrived video (start: {vid_start}, end: {vid_end})")
+
+                            video_file = await VideoFile.check_if_exists(
+                                db_session=session,
+                                param_name='playback_uri',
+                                param_val=item['playbackURI']
+                            )
+                            if not video_file:
+                                video_file = await VideoFile.create(
+                                    db_session=session,
+                                    camera_id=self.camera_id,
+                                    path='TBD',
+                                    vid_start=vid_start,
+                                    vid_end=vid_end,
+                                    playback_uri=item['playbackURI']
+                                )
+                            
+                            await self.queue_download_video.put(video_file)
+                            break  # redo
 
             except Exception as exc:
                 logger.error(exc)
@@ -166,12 +193,12 @@ class Application:
         ???
         """
         while True:
-            data = await self.queue_download_video.get()
+            video_item = await self.queue_download_video.get()
             try:
                 filepath = await download_files(
                     channel=cfg.channel,
                     recorder_ip=cfg.recorder_ip,
-                    data=data
+                    data=video_item
                 )
                 await self.queue_process_video.put(filepath)
 
@@ -187,19 +214,36 @@ class Application:
         while True:
             item = await self.queue_process_video.get()
             try:
-                self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
-                    detector=self.detector,
-                    seg_detector=self.detector_seg,
-                    video_path=item,
-                    camera_id=self.camera_id,
-                    saw_already_moving = self.saw_already_moving,
-                    stone_already_present = self.stone_already_present,
-                    stone_history = self.stone_history,
-                    stone_area_list = self.stone_area_list,
-                    event_list=self.event_list,
-                    stone_area = self.stone_area
-                )
-                _, self.last_video_end = get_time_from_video_path(item)
+                async with SessionLocal() as session:
+                    
+                    await VideoFile.update(
+                        db_session=session,
+                        videofile_id=item.id,
+                        det_start=datetime.now(),
+                        is_downloaded=True
+                    )
+
+                    self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
+                        detector=self.detector,
+                        seg_detector=self.detector_seg,
+                        video_path=item,
+                        camera_id=self.camera_id,
+                        saw_already_moving = self.saw_already_moving,
+                        stone_already_present = self.stone_already_present,
+                        stone_history = self.stone_history,
+                        stone_area_list = self.stone_area_list,
+                        event_list=self.event_list,
+                        stone_area = self.stone_area
+                    )
+
+                    await VideoFile.update(
+                        db_session=session,
+                        videofile_id=item.id,
+                        det_end=datetime.now(),
+                        is_processed=True
+                    )
+                    
+                    _, self.last_video_end = get_time_from_video_path(item)
             except Exception as e:
                 print(e)
             finally:

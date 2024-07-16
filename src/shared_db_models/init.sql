@@ -18,19 +18,20 @@ CREATE TABLE events (
     type_id INTEGER REFERENCES event_types(id),
     camera_id INTEGER REFERENCES cameras(id),
     time TIMESTAMP,
-    machine VARCHAR,
+    machine VARCHAR(255),
     stone_number INTEGER,
-    comment VARCHAR,
+    stone_area VARCHAR(50),
+    comment VARCHAR(255),
     deleted BOOLEAN DEFAULT FALSE
 );
 
 CREATE TABLE video_files (
     id SERIAL PRIMARY KEY,
     camera_id INTEGER REFERENCES cameras(id),
-    path VARCHAR NOT NULL,
-    name VARCHAR,
-    orig_name VARCHAR,
-    playback_uri VARCHAR,
+    path VARCHAR(255) NOT NULL,
+    name VARCHAR(255),
+    orig_name VARCHAR(255),
+    playback_uri VARCHAR(255),
     vid_start TIMESTAMP,
     vid_end TIMESTAMP,
     is_downloaded BOOLEAN DEFAULT FALSE,

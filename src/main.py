@@ -8,19 +8,14 @@ import numpy as np
 from PIL import Image, ImageDraw
 from ultralytics import YOLO
 
-import core.config as cfg
-from core.logger import logger
-from core.database import Base
-from core.database import db_engine
-from detector.detector import Detector
-from core.downloader import get_files_list
-from core.downloader import download_files
-from core.scenarios import process_video_file
-from core.scenarios import process_live_video
-from core.scenarios import calculate_segment_area
-from core.utils import crop_images_in_folder
-from core.models import *
-from core.app import Application
+import src.core.config as cfg
+from src.core.logger import logger
+from src.core.app import Application
+# from shared_db_models.database import Base
+# from shared_db_models.database import db_engine
+from shared_db_models.models.models import *
+from detection.detector.detector import Detector
+from detection.services import process_video_file
 
 
 async def main():
@@ -31,13 +26,13 @@ async def main():
     seg_detector = Detector(mode='seg')
 
     """ init application """
-    # app = Application()
-    # app.start()
-    # try:
-    #     while app.status == 1:
-    #         await asyncio.sleep(5)
-    # except KeyboardInterrupt:
-    #     app.stop()
+    app = Application()
+    app.start()
+    try:
+        while app.status == 1:
+            await asyncio.sleep(5)
+    except KeyboardInterrupt:
+        app.stop()
 
     """ create db """
     # async with db_engine.begin() as conn:

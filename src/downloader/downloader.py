@@ -116,6 +116,7 @@ async def get_files_list(
 async def download_files(
         channel: int,
         recorder_ip: str,
+        file_id: int,
         data: dict
 ) -> None:
 
@@ -134,7 +135,7 @@ async def download_files(
     async with SessionLocal() as session:  # close session?
         await VideoFile.update(
             db_session=session,
-            id=data.id,
+            id=file_id,
             path=data_filepath,
             download_start=datetime.now()
         )
@@ -202,7 +203,7 @@ async def download_files(
 
         videofile = await VideoFile.update(
                 db_session=session,
-                id=data.id,
+                id=file_id,
                 download_end=datetime.now(),
                 is_downloaded=True
             )

@@ -4,7 +4,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - ./src/core/init.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./src/shared_db_models/init.sql:/docker-entrypoint-initdb.d/init.sql
       - /etc/timezone:/etc/timezone:ro
       - /etc/localtime:/etc/localtime:ro
     env_file:

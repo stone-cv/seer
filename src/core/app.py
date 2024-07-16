@@ -226,7 +226,7 @@ class Application:
                 async with SessionLocal() as session:
                     await VideoFile.update(
                         db_session=session,
-                        videofile_id=file_id,
+                        id=file_id,
                         is_downloaded=True
                     )
 
@@ -263,7 +263,7 @@ class Application:
                 async with SessionLocal() as session:
                     await VideoFile.update(
                         db_session=session,
-                        videofile_id=file_id,
+                        id=file_id,
                         det_start=det_start,
                         det_end=datetime.now(),
                         is_processed=True

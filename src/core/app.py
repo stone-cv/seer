@@ -170,8 +170,10 @@ class Application:
                                 param_name='playback_uri',
                                 param_val=item['playbackURI']
                             )
+                            logger.debug(f'Video file found in DB: {video_file.__dict__}')
+                            
                             if not video_file:
-                                video_file = await VideoFile.create(
+                                await VideoFile.create(
                                     db_session=session,
                                     camera_id=self.camera_id,
                                     path='TBD',
@@ -180,7 +182,7 @@ class Application:
                                     playback_uri=item['playbackURI']
                                 )
                             
-                            await self.queue_download_video.put(video_file)
+                            await self.queue_download_video.put(item)
                             break  # redo
 
             except Exception as exc:

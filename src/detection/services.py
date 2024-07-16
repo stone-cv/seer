@@ -13,7 +13,7 @@ from core.logger import logger
 from detector.detector import Detector
 from core.models import Event
 from core.models import Camera
-from core.database import SessionLocal
+from shared_db_models.database import SessionLocal
 from core.utils import extract_frame
 from core.utils import send_event_info
 from core.utils import get_time_from_video_path

@@ -13,7 +13,7 @@ from typing import List
 import core.config as cfg
 from core.logger import logger
 from core.models import Camera
-from core.database import SessionLocal
+from shared_db_models.database import SessionLocal
 
 
 def extract_frame(

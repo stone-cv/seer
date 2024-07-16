@@ -10,9 +10,9 @@ from tqdm import tqdm
 from lxml import etree
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
-import src.core.config as cfg
-from src.core.logger import logger
-from src.core.utils import xml_helper
+import core.config as cfg
+from core.logger import logger
+from core.utils import xml_helper
 from shared_db_models.database import SessionLocal
 from shared_db_models.models.models import VideoFile
 

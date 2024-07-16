@@ -3,7 +3,7 @@ from typing import Any
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.core.logger import logger
+from core.logger import logger
 from shared_db_models.database import Base
 
 

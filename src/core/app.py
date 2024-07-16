@@ -3,9 +3,9 @@ from typing import List
 from datetime import datetime
 from datetime import timedelta
 
-import src.core.config as cfg
-from src.core.logger import logger
-from src.core.utils import get_time_from_video_path
+import core.config as cfg
+from core.logger import logger
+from core.utils import get_time_from_video_path
 from detection.detector.detector import Detector
 from detection.services import process_video_file
 from downloader.downloader import get_files_list
@@ -38,7 +38,7 @@ class Application:
         self.stone_area_list: List[float] = []
         self.stone_area: float = 0
         self.event_list: List[Event] = []
-        self.last_video_end: datetime = datetime.now() - timedelta(hours=2)
+        self.last_video_end: datetime = datetime.now() - timedelta(hours=14)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 

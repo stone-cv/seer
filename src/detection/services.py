@@ -8,11 +8,11 @@ from datetime import timedelta
 from threading import Thread
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import src.core.config as cfg
-from src.core.logger import logger
-from src.core.utils import extract_frame
-from src.core.utils import send_event_info
-from src.core.utils import get_time_from_video_path
+import core.config as cfg
+from core.logger import logger
+from core.utils import extract_frame
+from core.utils import send_event_info
+from core.utils import get_time_from_video_path
 from detection.detector.detector import Detector
 from shared_db_models.models.models import Event
 from shared_db_models.models.models import Camera

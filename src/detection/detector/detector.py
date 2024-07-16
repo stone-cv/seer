@@ -17,8 +17,8 @@ from ultralytics import YOLO
 from clearml import Task
 from sklearn.model_selection import train_test_split
 
-import src.core.config as cfg
-from src.core.logger import logger
+import core.config as cfg
+from core.logger import logger
 
 
 class Detector:
@@ -27,8 +27,8 @@ class Detector:
        
         self.capture_index = capture_index
         
-        # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.device = 'mps'  # 'cpu'
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # self.device = 'mps'  # 'cpu'
         print("Using Device: ", self.device)
         
         self.model = self.load_model(mode)

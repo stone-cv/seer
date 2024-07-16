@@ -8,9 +8,9 @@ import numpy as np
 from PIL import Image, ImageDraw
 from ultralytics import YOLO
 
-import src.core.config as cfg
-from src.core.logger import logger
-from src.core.app import Application
+import core.config as cfg
+from core.logger import logger
+from core.app import Application
 # from shared_db_models.database import Base
 # from shared_db_models.database import db_engine
 from shared_db_models.models.models import *
@@ -22,8 +22,8 @@ async def main():
 
     logger.info('App initiated')
 
-    detector = Detector(mode='det')
-    seg_detector = Detector(mode='seg')
+    #detector = Detector(mode='det')
+    #seg_detector = Detector(mode='seg')
 
     """ init application """
     app = Application()
@@ -52,14 +52,14 @@ async def main():
 
     """ process video & detect objects """
 
-    await process_video_file(
-        detector=detector,
-        seg_detector=seg_detector,
-        video_path=cfg.video_path,
-        saw_already_moving=None,
-        stone_already_present=None,
-        camera_id=cfg.camera_id
-    )
+    #await process_video_file(
+    #    detector=detector,
+    #    seg_detector=seg_detector,
+    #    video_path=cfg.video_path,
+    #    saw_already_moving=None,
+    #    stone_already_present=None,
+    #    camera_id=cfg.camera_id
+    #)
 
 
 if __name__ == '__main__':

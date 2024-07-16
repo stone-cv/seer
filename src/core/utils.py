@@ -10,8 +10,8 @@ from datetime import datetime
 from typing import Any
 from typing import List
 
-import src.core.config as cfg
-from src.core.logger import logger
+import core.config as cfg
+from core.logger import logger
 from shared_db_models.models.models import Camera
 from shared_db_models.database import SessionLocal
 

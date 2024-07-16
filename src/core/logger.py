@@ -4,7 +4,7 @@ import logging
 
 from logging.handlers import TimedRotatingFileHandler
 
-import src.core.config as cfg
+import core.config as cfg
 
 logger = logging.getLogger("my_logger")
 os.makedirs(cfg.log_dir, exist_ok=True)
@@ -16,7 +16,7 @@ file_handler.namer = lambda name: name + ".log"
 
 console_handler = logging.StreamHandler()
 
-formatter = logging.Formatter('%(asctime)s %(name)s:%(levelname)s - %(message)s')
+formatter = logging.Formatter('%(asctime)s:%(levelname)s - %(message)s')
 
 file_handler.setFormatter(formatter)
 console_handler.setFormatter(formatter)

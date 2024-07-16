@@ -15,8 +15,8 @@ from sqlalchemy.orm import relationship
 from sqlalchemy.future import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import src.core.config as cfg
-from src.core.logger import logger
+import core.config as cfg
+from core.logger import logger
 from shared_db_models.database import Base
 from shared_db_models.models.base_model import BaseCRUD
 

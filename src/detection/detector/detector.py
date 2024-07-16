@@ -169,7 +169,7 @@ class Detector:
             device=self.device,
             # tracker="bytetrack.yaml",
             # stream=True,
-            show=True
+            # show=True
         )
 
         return results

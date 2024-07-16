@@ -167,8 +167,8 @@ async def process_video_file(
                                             db_session=session,
                                             event=event,
                                         )
-                                        logger.info(f'JSON:{json}')
-                                        # await send_event_info(frame=frame, data=json,detection_time=detection_time)
+                                        logger.debug(f'JSON:{json}')
+                                        await send_event_info(frame=frame, data=json,detection_time=detection_time)
 
                                         # event_list.remove(event)
 

@@ -335,6 +335,23 @@ class VideoFile(BaseCRUD):
     det_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)  # timestamp?
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    @staticmethod
+    async def check_if_file_is_downloaded(
+        *,
+        db_session: AsyncSession,
+        file_id: int
+    ) -> bool:
+
+        file = await db_session.execute(
+            select(VideoFile).filter(
+                VideoFile.id == file_id
+            )
+        )
+        file = file.scalars().first()
+        logger.debug(f'File {file_id} is downloaded: {file.is_downloaded}')
+
+        return file.is_downloaded
     
     @staticmethod
     async def get_unprocessed_files(

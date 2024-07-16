@@ -196,18 +196,30 @@ class Application:
         """
         while True:
             video_item, file_id = await self.queue_download_video.get()
+
             try:
-                filepath = await download_files(
-                    channel=cfg.channel,
-                    recorder_ip=cfg.recorder_ip,
-                    file_id=file_id,
-                    data=video_item
-                )
-                await self.queue_process_video.put(filepath)
+                async with SessionLocal() as session:
+                    video_file = await VideoFile.get_by_id(
+                        db_session=session,
+                        id=file_id
+                    )
+                
+                if video_file.is_downloaded and video_file.path and video_file.path != 'TBD':
+                    filepath = video_file.path
+
+                else:
+                    filepath = await download_files(
+                        channel=cfg.channel,
+                        recorder_ip=cfg.recorder_ip,
+                        file_id=file_id,
+                        data=video_item
+                    )
 
             except Exception as exc:
                 logger.error(exc)
+
             finally:
+                await self.queue_process_video.put((filepath, video_file.id))
                 self.queue_download_video.task_done()
     
     async def process_video_file(self):
@@ -215,13 +227,13 @@ class Application:
         ???
         """
         while True:
-            item = await self.queue_process_video.get()
+            filepath, file_id = await self.queue_process_video.get()
             try:
                 async with SessionLocal() as session:
                     
                     await VideoFile.update(
                         db_session=session,
-                        videofile_id=item.id,
+                        videofile_id=file_id,
                         det_start=datetime.now(),
                         is_downloaded=True
                     )
@@ -229,7 +241,7 @@ class Application:
                     self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
                         detector=self.detector,
                         seg_detector=self.detector_seg,
-                        video_path=item,
+                        video_path=filepath,
                         camera_id=self.camera_id,
                         saw_already_moving = self.saw_already_moving,
                         stone_already_present = self.stone_already_present,
@@ -241,12 +253,12 @@ class Application:
 
                     await VideoFile.update(
                         db_session=session,
-                        videofile_id=item.id,
+                        videofile_id=file_id,
                         det_end=datetime.now(),
                         is_processed=True
                     )
                     
-                    _, self.last_video_end = get_time_from_video_path(item)
+                    _, self.last_video_end = get_time_from_video_path(filepath)
             except Exception as e:
                 print(e)
             finally:

@@ -132,13 +132,7 @@ async def download_files(
 
     data_filepath = os.path.join(reg_path, file_name)
 
-    async with SessionLocal() as session:  # close session?
-        await VideoFile.update(
-            db_session=session,
-            id=file_id,
-            path=data_filepath,
-            download_start=datetime.now()
-        )
+    download_start = datetime.now()
 
     # Начинаем загрузку файлов
     api_url = f'http://{recorder_ip}/ISAPI/'
@@ -200,13 +194,14 @@ async def download_files(
             await asyncio.sleep(5)
     
     if success:
-
-        videofile = await VideoFile.update(
-                db_session=session,
-                id=file_id,
-                download_end=datetime.now(),
-                is_downloaded=True
-            )
+        async with SessionLocal() as session:
+            videofile = await VideoFile.update(
+                    db_session=session,
+                    id=file_id,
+                    download_start=download_start,
+                    download_end=datetime.now(),
+                    is_downloaded=True
+                )
 
         return videofile
 

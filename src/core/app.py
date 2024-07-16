@@ -202,15 +202,15 @@ class Application:
                         db_session=session,
                         id=file_id
                     )
-                    logger.debug(f'File {video_file.__dict__} retrieved for downloading')
+                    logger.debug(f'File {video_file.id} retrieved for downloading')
 
                 
                 if video_file.is_downloaded and video_file.path and video_file.path != 'TBD':
-                    logger.debug(f'File {video_file.__dict__} already downloaded')
+                    logger.debug(f'File {video_file.id} already downloaded')
                     filepath = video_file.path
 
                 else:
-                    logger.debug(f'Downloading file {video_file.__dict__}...')
+                    logger.debug(f'Downloading file {video_file.id}...')
                     filepath = await download_files(
                         channel=cfg.channel,
                         recorder_ip=cfg.recorder_ip,
@@ -222,7 +222,14 @@ class Application:
                 logger.error(exc)
 
             finally:
-                logger.debug(f'File {video_file.__dict__} downloaded')
+                logger.debug(f'File {video_file.id} downloaded')
+                async with SessionLocal() as session:
+                    await VideoFile.update(
+                        db_session=session,
+                        videofile_id=file_id,
+                        is_downloaded=True
+                    )
+
                 await self.queue_process_video.put((filepath, video_file.id))
                 self.queue_download_video.task_done()
     
@@ -233,40 +240,33 @@ class Application:
         while True:
             filepath, file_id = await self.queue_process_video.get()
             try:
+                det_start = datetime.now()
+                logger.debug(f'File {file_id} is being processed')
+                
+                self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
+                    detector=self.detector,
+                    seg_detector=self.detector_seg,
+                    video_path=filepath,
+                    camera_id=self.camera_id,
+                    saw_already_moving = self.saw_already_moving,
+                    stone_already_present = self.stone_already_present,
+                    stone_history = self.stone_history,
+                    stone_area_list = self.stone_area_list,
+                    event_list=self.event_list,
+                    stone_area = self.stone_area
+                )
+                logger.debug(f'File {file_id} processed')
+
                 async with SessionLocal() as session:
-                    logger.debug(f'File {file_id} retrieved for processing')
-                    
                     await VideoFile.update(
                         db_session=session,
                         videofile_id=file_id,
-                        det_start=datetime.now(),
-                        is_downloaded=True
-                    )
-                    logger.debug(f'File {file_id} is being processed')
-
-                    self.saw_already_moving, self.stone_already_present, self.stone_history, self.stone_area_list, self.stone_area, self.event_list = await process_video_file(
-                        detector=self.detector,
-                        seg_detector=self.detector_seg,
-                        video_path=filepath,
-                        camera_id=self.camera_id,
-                        saw_already_moving = self.saw_already_moving,
-                        stone_already_present = self.stone_already_present,
-                        stone_history = self.stone_history,
-                        stone_area_list = self.stone_area_list,
-                        event_list=self.event_list,
-                        stone_area = self.stone_area
-                    )
-
-                    logger.debug(f'File {file_id} processed')
-
-                    await VideoFile.update(
-                        db_session=session,
-                        videofile_id=file_id,
+                        det_start=det_start,
                         det_end=datetime.now(),
                         is_processed=True
                     )
-                    
-                    _, self.last_video_end = get_time_from_video_path(filepath)
+                
+                _, self.last_video_end = get_time_from_video_path(filepath)
             except Exception as e:
                 print(e)
             finally:

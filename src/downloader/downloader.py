@@ -198,6 +198,7 @@ async def download_files(
             videofile = await VideoFile.update(
                     db_session=session,
                     id=file_id,
+                    path=data_filepath,
                     download_start=download_start,
                     download_end=datetime.now(),
                     is_downloaded=True

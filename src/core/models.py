@@ -112,7 +112,7 @@ class Event(Base):
             "machine": "PW1TK 3000",
             "operation": event_type.name,
             "number": "0",
-            "area": float(event.stone_area),  # if event.stone_area else "0",  # check
+            "area": float(event.stone_area),
             "comment": "площадь в см2"
         }
         event_json = json.dumps(event_dict)

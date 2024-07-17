@@ -38,7 +38,7 @@ class Application:
         self.stone_area_list: List[float] = []
         self.stone_area: float = 0
         self.event_list: List[Event] = []
-        self.last_video_end: datetime = datetime.now() - timedelta(hours=15)
+        self.last_video_end: datetime = datetime.now() - timedelta(hours=self.deep_archive)
         # self.timezone_offset: int = (pytz.timezone(config.get("Application", "timezone", fallback="UTC"))).utcoffset(datetime.now()).seconds
         # logger.info(f"Server offset timezone: {self.__timezone_offset}")
 

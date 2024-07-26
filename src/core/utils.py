@@ -43,7 +43,7 @@ def extract_frame(
     frame_idx = 0
     frame_count = 0
 
-    while frame_count <= video_frame_count:
+    while frame_count <= video_frame_count:  # ?
         ret, frame = video.read()
         if not ret:
             break
@@ -257,7 +257,7 @@ async def send_event_info(
     # return response
 
 
-def create_camera_roi(frame) -> list():  # doesn't work here but implemented in "if __name__ == '__main__'"
+def create_camera_roi(frame):  # doesn't work here but implemented in "if __name__ == '__main__'"
     """
     Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
 
@@ -310,7 +310,7 @@ if __name__ == '__main__':
             break
 
     # logger.info(roi_points)
-    print(f'Updated ROI coord: {roi_points}') 
+    logger.info(f'Updated ROI coord: {roi_points}') 
     cv2.destroyAllWindows()
 
     # async with SessionLocal() as session:

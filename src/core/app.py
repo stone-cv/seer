@@ -22,7 +22,7 @@ class Application:
         self.detector: Detector = Detector(capture_index=0, mode='det')
         self.detector_seg: Detector = Detector(capture_index=0, mode='seg')
         self.camera_id: int = cfg.camera_id
-        self.cam_track_id: int = None  # !!!!!
+        self.cam_track_id: int = None  # TODO
         self.queue_search_video: asyncio.Queue = asyncio.Queue()
         self.queue_download_video: asyncio.Queue = asyncio.Queue()
         self.queue_process_video: asyncio.Queue = asyncio.Queue()
@@ -223,12 +223,12 @@ class Application:
 
             finally:
                 logger.debug(f'File {video_file.id} downloaded')
-                async with SessionLocal() as session:
-                    await VideoFile.update(
-                        db_session=session,
-                        id=file_id,
-                        is_downloaded=True
-                    )
+                # async with SessionLocal() as session:
+                #     await VideoFile.update(
+                #         db_session=session,
+                #         id=file_id,
+                #         is_downloaded=True
+                #     )
 
                 await self.queue_process_video.put((filepath, video_file.id))
                 logger.debug(f'{self.queue_process_video.qsize()} files in the queue')

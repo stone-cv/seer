@@ -69,7 +69,8 @@ async def get_files_list(
                     await asyncio.sleep(5)
                     continue
 
-                success = True
+                else:
+                    success = True
 
             # except (httpx.TimeoutException, httpx.ReadTimeout, asyncio.CancelledError) as exc:
             except Exception as exc:

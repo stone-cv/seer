@@ -32,26 +32,53 @@ async def process_video_file(
     event_list: List[Event] = [],
 ) -> tuple:
     """
-    ???
+    Функция, объединяющая всю логику обработки видеофайла:
+        - извлечение кадров из видеофайла;
+        - детекция объектов с помощью моделей (+ при необходимости сегментация);
+        - парсинг результатов детекции;
+        - выполнение логики срабатывания событий;
+        - отправка информации об событиях.
+
+    Args:
+        detector (Detector): модель, выполяющая детекцию объектов
+        seg_detector (Detector): модель, выполняющая сегментацию
+        video_path (str): путь к видеофайлу
+        camera_id (int): ID камеры
+        saw_already_moving (bool): флаг, демонстрирующий движение пилы. По умолчанию - False
+        stone_already_present (bool): флаг, демонстрирующий наличие камня. По умолчанию - False
+        stone_history (List[bool]): история наличия камня за заданный промежуток
+        stone_area_list (List[float]): список площадей камня за заданный промежуток
+        stone_area (float): площадь камня в см2
+        event_list (List[Event]): список созданных событий
+    
+    Returns:
+        tuple: кортеж, содержащий обновленные значения следующих переменных:
+            - saw_already_moving (bool)
+            - stone_already_present (bool)
+            - stone_history (List[bool])
+            - stone_area_list (List[float])
+            - stone_area (float)
+            - event_list (List[Event])
     """
 
     vid_start_time, _ = get_time_from_video_path(video_path)
 
-    # variables for saw logic
+    # инициализация переменных для логики пилы
     saw_xywh_history = []
     saw_track_magn = 0
 
-    # variables for stone logic
+    # инициализация переменных для логики камней
     class_ids = []
     forklift_history = []
     
     try:
         async with SessionLocal() as session:
-            camera_roi = await Camera.get_roi_by_camera_id(
+            camera_roi = await Camera.get_roi_by_camera_id(  # move up
                 db_session=session,
                 camera_id=camera_id
             )
 
+            # извлечение кадров из видеофайла
             frame_generator = extract_frame(
                 video_path=video_path,
                 camera_roi=camera_roi,
@@ -64,30 +91,16 @@ async def process_video_file(
                 detection_time = vid_start_time + timedelta(seconds=frame_idx/video_fps)
                 logger.debug(f'Detection time: {detection_time}')
 
-                # region test posting img
-                # event = await Event.event_create(
-                #     db_session=session,
-                #     type_id=4,  # rm hardcoded id
-                #     camera_id=camera_id,
-                #     time=detection_time
-                # )
-                # json = await Event.convert_event_to_json(
-                #     db_session=session,
-                #     event=event,
-                # )
-                # await send_event_info(frame=frame, data=json, detection_time=detection_time)
-                # return
-                # endregion
-
+                # обработка кадра с помощью модели и трекера
                 results = detector.track_custom(source=frame)
 
                 for result in results:
-                    frame_pred = detector.parse_detections(result)  # _ / detections for an outside tracker
+                    frame_pred = detector.parse_detections(result)
 
                     for item in frame_pred:
                         item['time'] = detection_time
 
-                        # ROI check
+                        # проверка, находится ли объект в интресующей нас области (ROI)
                         item_in_roi = await is_in_roi(
                             roi_xyxy=camera_roi,
                             object_xyxy=item['xyxy']
@@ -95,8 +108,8 @@ async def process_video_file(
                         if item_in_roi:
                             class_ids.append(item['class_id'])
 
-                            # saw motion logic
-                            if item['class_id'] == 1:  # saw class id
+                            # логика, относящаяся к пиле: проверка на движение
+                            if item['class_id'] == 1:  # ID класса пилы
                                 saw_track_magn, saw_already_moving, saw_event = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
@@ -111,14 +124,14 @@ async def process_video_file(
                                 if saw_event:
                                     event_list.append(saw_event)
 
-                    # stone logic
+                    # логика, относящаяся к камням: проверка на наличие и перемещение
                     stone_already_present, stone_history, stone_event = await check_if_stone_present_or_transferred(
                         db_session=session,
-                        stone_id=0,  # stone class id
+                        stone_id=0,  # ID класса камня
                         detected_class_ids=class_ids,
                         object_history=stone_history,
                         object_already_present=stone_already_present,
-                        forklift_id=2,  # forklift class id
+                        forklift_id=2,  # ID класса погрузчика
                         forklift_history=forklift_history,
                         saw_already_moving=saw_already_moving,
                         curr_fps=curr_fps,
@@ -132,7 +145,7 @@ async def process_video_file(
                     if len(event_list) > 0:
                         logger.debug(f'Event list: {event_list}')
 
-                        # area calculation
+                        # вычисление площади камня
                         stone_area, stone_area_list = await get_stone_area(
                             db_session=session,
                             frame=frame,
@@ -148,10 +161,13 @@ async def process_video_file(
 
                         logger.debug(f'Stone area: {stone_area}')
 
+                        # если площадь < 0: она еще не была рассчитана достаточное кол-во раз для вычсления среднего значения
+                        # если 0 < площадь < 1: не были обнаружены сегменты для вычисления площади камня
                         if stone_area > 0:
                             if stone_area < 1:  # or not stone_already_present:
                                 stone_area = 0
 
+                            # каждое событие обновляется (добавляется площадь камня), а данные о нем отправляются на внешнее API
                             for event in event_list:
                                 try:
                                     logger.debug(f'Event: {event.__dict__}')
@@ -168,9 +184,9 @@ async def process_video_file(
                                             event=event,
                                         )
                                         logger.debug(f'JSON:{json}')
-                                        await send_event_info(frame=frame, data=json,detection_time=detection_time)
 
-                                        # event_list.remove(event)
+                                        # отправка данных на внешний API
+                                        await send_event_info(frame=frame, data=json,detection_time=detection_time)
 
                                 except Exception as exc:
                                     logger.error(exc)
@@ -214,7 +230,7 @@ async def is_in_roi(
 
     is_in_roi = False
 
-    # Check if the bounding box intersects or lies within the ROI
+    # проверяем, пересекаются ли координаты bbox'а с областью интереса
     if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
         is_in_roi = True
 
@@ -245,7 +261,9 @@ def calculate_motion(
     return magnitude
 
 
-def calculate_center(bbox: List[float]) -> np.ndarray:
+def calculate_center(
+        bbox: List[float]
+) -> np.ndarray:
     """
     Функция, позволяющая вычислить координаты центра bbox'а.
 
@@ -285,14 +303,17 @@ def is_moving(
 
 def calculate_segment_area(
         segment_coord: np.ndarray,
-        ratio_px_to_cm: float = 1.2  # 0.8 recalculate
+        ratio_px_to_cm: float = 1.2  # вычислено исходя из того, что диаметр пилы = 220 см
 ) -> float:
     """
     Функция, позволяющая рассчитать площадь сегмента в квадратных сантиметрах.
 
     Args:
         segment (List[float]/np.ndarray): координаты сегмента
+
         ratio_px_to_cm (float): коэффициент пересчета пикселей в сантиметры
+            (по умолчанию 1.2, вычислено исходя из того,
+             что диаметр пилы = 220 см в реальности и = 180 пикселей на кадре)
     
     Returns:
         float: площадь сегмента в квадратных сантиметрах
@@ -308,7 +329,18 @@ def calculate_segment_area(
     return area_cm2
 
 
-def convert_xywh_to_xyxy(bbox_xywh):
+def convert_xywh_to_xyxy(
+        bbox_xywh: np.ndarray
+) -> list[float]:
+    """
+    Функция, позволяющая перевести координаты bbox'а из формата XYWH в XYXY.
+
+    Args:
+        bbox_xywh (np.ndarray): координаты bbox'а в формате XYWH
+    
+    Returns:
+        np.ndarray: координаты bbox'а в формате XYXY
+    """
     x, y, w, h = bbox_xywh
     x1 = x
     y1 = y
@@ -323,14 +355,13 @@ async def check_for_motion(
         detected_item: dict,
         saw_track_magn: float,
         already_moving: bool,
-        # last_motion: bool,  # TODO check for short motion
         curr_fps: int,
         detection_time: datetime,
         camera_id: int,
-        frame: np.ndarray,
-) -> tuple[float, bool]:
+        # frame: np.ndarray
+) -> tuple[float, bool, Event]:
     """
-    Функция, позволяющая определить, движется ли объект:
+    Функция, позволяющая определить, движется ли объект (пила):
         - фиксируется величина смещения bbox'а за указанный
         в конфиг. файле отрезок времени;
         - если делается вывод о том, что объект находится в движении,
@@ -346,16 +377,21 @@ async def check_for_motion(
         already_moving (bool): флаг, обозначающий, находился ли в движении объект до текущей проверки
         curr_fps (int): количество кадров, анализируемых за секунду видео
         detection_time (datetime): время обнаружения объекта
+        camera_id (int): ID камеры
     
     Returns:
-        saw_track_magn (float): обновленная величина смещения bbox'а
-        already_moving (bool): обновленное значение
+        кортеж, содержащий в себе:
+            - saw_track_magn (float): обновленная величина смещения bbox'а
+            - already_moving (bool): обновленное значение
+            - event (Event): созданное событие
     """
     event = None
 
     xywh_history.append(detected_item['xywh'])
 
     if len(xywh_history) > 1:
+
+        # собираем инфрмацию о движении объекта за заданный отрезок времени
         if len(xywh_history) < curr_fps * cfg.saw_moving_sec:
             magnitude = calculate_motion(
                 prev_bbox=xywh_history[-2],
@@ -363,6 +399,7 @@ async def check_for_motion(
             )
             saw_track_magn += magnitude
         else:
+            # если необходимое кол-во информации было собрано, делаем вывод о движении объекта
             logger.debug(f'Magnitude: {saw_track_magn}')
             in_motion = is_moving(
                 magnitude=saw_track_magn,
@@ -376,31 +413,29 @@ async def check_for_motion(
                 already_moving = in_motion
                 logger.info(f'saw_already_moving set: {already_moving}')
 
+            # если объект движется, но до этого был статичен, создаем событие о начале движения объекта
             elif in_motion and not already_moving:
-                # if not detect_occlusion(  # TODO verify against DEFINETLY not occluded bbox. reference size?
-                #     detected_bbox=xywh_history[-2],
-                #     reference_bbox=xywh_history[-1]
-                # ):
                 event = await Event.event_create(
                     db_session=db_session,
-                    type_id=3,  # rm hardcoded id
+                    type_id=3,  # событие "Начало распила товарного блока". TODO rm hardcoded id
                     camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'The saw started moving at {detection_time}, magnitude: {saw_track_magn}')
                 already_moving = True
 
+            # если объект статичен, но до этого был в движении, создаем событие об остановке объекта
             elif not in_motion and already_moving:
                 event = await Event.event_create(
                     db_session=db_session,
-                    type_id=4,  # rm hardcoded id
+                    type_id=4,  # событие "Окончание распила товарного блока". TODO rm hardcoded id
                     camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'The saw stopped moving at {detection_time}, magnitude: {saw_track_magn}')
                 already_moving = False
 
-            # clear history
+            # сбрасываем величину смещения bbox'а и историю координат bbox'а
             saw_track_magn = 0
             logger.debug('Saw magnitude nullified')
             xywh_history.clear()
@@ -418,12 +453,12 @@ async def check_if_stone_present_or_transferred(
         curr_fps: int,
         detection_time: datetime,
         camera_id: int,
-        frame: np.ndarray,
         stone_id: int = 0,
         forklift_id: int = 2
-):
+        # frame: np.ndarray
+) -> tuple[bool, list[bool], Event]:
     """
-    Функция, позволяющая определить, присутствиует ли на видео объект:
+    Функция, позволяющая определить, присутствиует ли на видео объект (камень):
         - фиксируется наличие или отсутствие детекции объекта заданного класса 
         на протяжении указанного в конфиг. файле отрезка времени;
         - если делается вывод о том, что объект находится на видео,
@@ -433,19 +468,28 @@ async def check_if_stone_present_or_transferred(
 
     Args:
         db_session (AsyncSession): объект асинхронной сессии БД
-        stone_id (int): идентификатор класса детекции, к которому принадлежит объект
-        detected_class_ids (List[int]): список идентификаторов классов детекции, обнаруженных на кадре
-        object_history (List[bool]): список значений, обозначающих наличие или отсутствие обьъекта на кадре
+        detected_class_ids (List[int]): список ID классов детекции, обнаруженных на кадре
+        object_history (List[bool]): список значений, обозначающих наличие или отсутствие объекта на кадре
         object_already_present (bool): флаг, обозначающий, находился ли объект на видео до текущей проверки
+        forklift_history (List[bool]): список значений, обозначающих наличие или отсутствие погрузчика на кадре
+        saw_already_moving (bool): флаг, обозначающий, находится ли в движении пила
         curr_fps (int): количество кадров, анализируемых за секунду видео
         detection_time (datetime): время обнаружения объекта
+        camera_id (int): ID камеры
+        stone_id (int): ID класса камня
+        forklift_id (int): ID класса погрузчика
     
     Returns:
-        object_already_present (bool): обновленное значение
+        кортеж, содержащий в себе:
+            - object_already_present (bool): обновленная величина смещения bbox'а
+            - object_history (List[bool]): обновленная история наличия объекта
+            - event (Event): созданное событие
     """
     event = None
 
     logger.debug(f'Class IDs: {detected_class_ids}')
+
+    # определяем, был ли обнаружен на кадре камень, и обновляем историю значений
     if stone_id in detected_class_ids:
         object_history.append(True)
     else:
@@ -459,13 +503,24 @@ async def check_if_stone_present_or_transferred(
                 object_already_present = False
             logger.info(f'object_already_present set: {object_already_present}')
     
+    # определяем, был ли обнаружен на кадре погрузчик, и обновляем историю значений
     if forklift_id not in detected_class_ids:
         forklift_history.append(False)
     else:
         forklift_history.append(True)
 
+        # если погрузчик был находится на видео на протяжении заданного отрезка времени,
+        # проверяем, не был ли перемещен камень
         if len(forklift_history) >= curr_fps * cfg.forklift_present_threshold:
 
+            # создаем событие о появлении нового камня, если были соблюдены все следующие условия:
+            # - пила не находится в движении;
+            # - погрузчик находится на видео на протяжении заданного отрезка времени (превышает заданный порог - допускаем погрешности детекции);
+            # - флаг о наличии камня установлен на значении False;
+            # - судя по истории, ранее камень не обнаруживался на видео на протяжении продолжительного отрезка времени,
+            # - но камень стабильно обнаруживается на видео в последние секунды
+            # ИЛИ
+            # - флаг о наличии камня установлен на значении False, но камень стабильно обнаруживается в течение последней минуты.
             if (
                 not saw_already_moving and
                 forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
@@ -479,15 +534,21 @@ async def check_if_stone_present_or_transferred(
 
                 event = await Event.event_create(
                     db_session=db_session,
-                    type_id=1,  # rm hardcoded id
+                    type_id=1,  # событие "Новый товарный блок на станке". TODO rm hardcoded id
                     camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'New stone detected at {detection_time}, event created: {event.__dict__}')
                 object_already_present = True
-
-                # object_history.clear()
             
+            # создаем событие об отсутствии камня, если были соблюдены все следующие условия:
+            # - пила не находится в движении;
+            # - погрузчик находится на видео на протяжении заданного отрезка времени (превышает заданный порог - допускаем погрешности детекции);
+            # - флаг о наличии камня установлен на значении True;
+            # - судя по истории, ранее камень присутствовал на видео на протяжении продолжительного отрезка времени,
+            # - но камень стабильно не обнаруживается на видео в последние секунды
+            # ИЛИ
+            # - флаг о наличии камня установлен на значении True, но камень стабильно отсутствует в течение последней минуты.
             elif (
                 not saw_already_moving and
                 forklift_history.count(True) > len(forklift_history) * cfg.majority_threshold and
@@ -501,16 +562,17 @@ async def check_if_stone_present_or_transferred(
 
                 event = await Event.event_create(
                     db_session=db_session,
-                    type_id=2,  # rm hardcoded id
+                    type_id=2,  # событие "Товарный блок убран со станка". TODO rm hardcoded id
                     camera_id=camera_id,
                     time=detection_time
                 )
                 logger.info(f'Stone removed at {detection_time}, event created: {event.__dict__}')
                 object_already_present = False
-
-                # object_history.clear()
     
     # region extra check if stone is present
+
+    # дополнительная проверка на наличие камня, не зависищая от присутствия погрузчика в кадре:
+    # создаем событие об обнаружении камня, если он стабильно обнаруживается в течение последней минуты
     if (
         object_already_present != None and
         not object_already_present and
@@ -519,13 +581,14 @@ async def check_if_stone_present_or_transferred(
 
         event = await Event.event_create(
             db_session=db_session,
-            type_id=1,  # rm hardcoded id
+            type_id=1,  # событие "Новый товарный блок на станке". TODO rm hardcoded id
             camera_id=camera_id,
             time=detection_time-timedelta(minutes=1)
         )
         logger.info(f'New stone detected at {detection_time-timedelta(minutes=1)}, event created: {event.__dict__}')
         object_already_present = True
     
+    # создаем событие об отсутствии камня, если он стабильно не виден в течение последней минуты
     elif (
         object_already_present != None and
         object_already_present and
@@ -534,7 +597,7 @@ async def check_if_stone_present_or_transferred(
 
         event = await Event.event_create(
             db_session=db_session,
-            type_id=2,  # rm hardcoded id
+            type_id=2,  # событие "Товарный блок убран со станка". TODO rm hardcoded id
             camera_id=camera_id,
             time=detection_time-timedelta(minutes=1)
         )
@@ -542,6 +605,7 @@ async def check_if_stone_present_or_transferred(
         object_already_present = False
     # endregion
 
+    # очищаем списки (при превышении заданного порога)
     detected_class_ids.clear()
 
     if len(forklift_history) > curr_fps * cfg.forklift_history_threshold:
@@ -565,12 +629,42 @@ async def get_stone_area(
     curr_fps: int,
     camera_id: int,
     detection_time: datetime
-):
+) -> tuple[float, list[float]]:
+    """
+    Функция, вычисляющая площадт камня:
+        - вычисляет площадь камня на протяжении заданного отрезка времени (на Х кадрах);
+        - вычисляет среднее значение площади.
+
+    Args:
+        db_session (AsyncSession): объект асинхронной сессии БД
+        frame (np.ndarray): кадр из видео
+        seg_detector (Detector): модель, выполняющая сегментацию
+        stone_already_present (bool): флаг, обозначающий, находился ли камень на видео до текущей проверки
+        stone_history (List[bool]): список значений, обозначающих наличие или отсутствие камня на кадре
+        stone_area_list (List[float]): список значений площади камня
+        stone_area (float): площадь камня на кадре
+        saw_already_moving (bool): флаг, обозначающий, находится ли в движении пила
+        curr_fps (int): количество кадров, анализируемых за секунду видео
+        camera_id (int): ID камеры
+        detection_time (datetime): время обнаружения объекта
+    
+    Returns:
+        кортеж, содержащий в себе:
+            - stone_area (float): обновленная площадь камня в квадратных сантиметрах
+            - stone_area_list (List[float]): обновленный список значений площади
+    """
     # если каменя нет или он пропал, то обнуляем площадь и не вычисляем, пока не появится
     # if not stone_already_present:
     #     stone_area = 0
     #     stone_area_list.clear()
 
+    # вычисляет площадь камня камня, если были соблюдены все следующие условия:
+    # - площадь текущего камня не была вычислена ранее;
+    # - флаг о наличии камня установлен на значении True;
+    # - пила не находится в движении (для исключения оккулюзии);
+    # - камень обнаружен в результатх детекции на текущем кадре;
+    # - погрузчик отсутствует на кадре (для исключения оккулюзии);
+    # - камень стабильно обнаруживается на видео в последние секунды.
     # if (
     #     stone_area == 0 and
     #     stone_already_present
@@ -582,17 +676,25 @@ async def get_stone_area(
     logger.debug(f'Stone list: {stone_area_list}')
 
     if len(stone_area_list) < cfg.max_stone_area_list:
+
+        # пропускаем кадр через модель для сегментации
         seg_results = seg_detector.model(source=frame)
+
+        # парсим результаты сегментации
         if seg_results and seg_results[0].masks:  # check if there are masks
             segment = seg_detector.parse_segmentation(seg_results)
 
+            # проверяем, находится ли найденный сегмент в области интереса
             # item_in_roi = await is_in_roi(
             #                 roi_xyxy=camera_roi,
             #                 object_xyxy=item['xyxy']
             #             )
             # if item_in_roi:
+
+            # отрисовываем сегментацию на кадре
             seg_detector.plot_segmentation(segment, frame, detection_time)
 
+            # вычисляем площадь сегмента и сохраняем значение в список
             stone_area_prelim = calculate_segment_area(segment)
             if stone_area_prelim > 0:
                 stone_area_list.append(stone_area_prelim)
@@ -600,16 +702,14 @@ async def get_stone_area(
             stone_area_list.append(0.1)  # check for no seg detection
 
     else:
+        # если список содерижит достаточное кол-во значений, вычисляем среднее значение площади
         stone_area = round(np.average(stone_area_list), 1)
         logger.debug(f'Average stone area: {stone_area}')
 
+        # обнуляем список значений площади
         stone_area_list.clear()
-
-        # if stone_area < 1:  # check for no seg detection
-        #     logger.info(f'Stone area too small: {stone_area}')
-        #     stone_area = 'not found'
     
-    return stone_area, stone_area_list
+    return (stone_area, stone_area_list)
 
 
 # region currently_not_used
@@ -636,7 +736,7 @@ async def find_class_objects_in_roi(
                 xyxy = item['xyxy']
                 xmin, ymin, xmax, ymax = xyxy
 
-                # Check if the bounding box intersects or lies within the ROI
+                # check if the bounding box intersects or lies within the ROI
                 if xmin <= roi_xmax and xmax >= roi_xmin and ymin <= roi_ymax and ymax >= roi_ymin:
                     logger.debug(f"Object with Class ID {class_id} is inside the ROI\n{item}")
                     prior_track_ids.append(item['track_id'])
@@ -649,7 +749,7 @@ async def find_class_objects_in_roi(
 
 async def get_event_end_time(events: dict, track_id: int):
 
-    # Initialize with a value lower than the minimum time
+    # initialize with a value lower than the minimum time
     last_detection_time = datetime.strptime("01.01.1970 00:00:00", "%d.%m.%Y %H:%M:%S")
     for _, values in events.items():
         for item in values:
@@ -661,7 +761,7 @@ async def get_event_end_time(events: dict, track_id: int):
 
 
 def calculate_iou(box1, box2):
-    # Calculate the intersection area
+
     x1 = max(box1[0], box2[0])
     y1 = max(box1[1], box2[1])
     x2 = min(box1[2], box2[2])
@@ -669,31 +769,25 @@ def calculate_iou(box1, box2):
 
     intersection_area = max(0, x2 - x1) * max(0, y2 - y1)
 
-    # Calculate the union area
     area_box1 = (box1[2] - box1[0]) * (box1[3] - box1[1])
     area_box2 = (box2[2] - box2[0]) * (box2[3] - box2[1])
     union_area = area_box1 + area_box2 - intersection_area
 
-    # Calculate IoU
     iou = intersection_area / union_area
     return iou
 
 def detect_occlusion(detected_bbox, reference_bbox, size_threshold=0.7, iou_threshold=0.5):
-    # Convert xywh format to xyxy format
+
     detected_bbox_xyxy = convert_xywh_to_xyxy(detected_bbox)
     reference_bbox_xyxy = convert_xywh_to_xyxy(reference_bbox)
 
-    # Calculate the areas of the detected and reference bounding boxes
     area_detected = detected_bbox[2] * detected_bbox[3]
     area_reference = reference_bbox[2] * reference_bbox[3]
 
-    # Compare the sizes of the bounding boxes
     size_difference = area_detected / area_reference
 
-    # Calculate IoU between the two bounding boxes
     iou = calculate_iou(detected_bbox_xyxy, reference_bbox_xyxy)
 
-    # Check for occlusion based on size difference and IoU threshold
     if size_difference < size_threshold and iou > iou_threshold:
         return True
     else:

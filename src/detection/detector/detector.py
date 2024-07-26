@@ -29,7 +29,7 @@ class Detector:
         
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         # self.device = 'mps'  # 'cpu'
-        print("Using Device: ", self.device)
+        logger.info("Using Device: ", self.device)
         
         self.model = self.load_model(mode)
         

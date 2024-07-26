@@ -119,7 +119,7 @@ async def process_video_file(
                                     curr_fps=curr_fps,
                                     detection_time=detection_time,
                                     camera_id=camera_id,
-                                    frame=frame
+                                    # frame=frame
                                 )
                                 if saw_event:
                                     event_list.append(saw_event)

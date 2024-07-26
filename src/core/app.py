@@ -232,7 +232,7 @@ class Application:
                 else:
                     logger.debug(f'Downloading file {video_file.id}...')
                     filepath = await download_files(
-                        channel=cfg.channel,
+                        # channel=cfg.channel,
                         recorder_ip=cfg.recorder_ip,
                         file_id=file_id,
                         data=video_item

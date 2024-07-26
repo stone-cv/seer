@@ -23,7 +23,7 @@ def extract_frame(
 ) -> Any:
     """
     Генератор, извлекающий из видео заданное количество кадров в секунду
-    и обрезающий кадры под размер области интереса.
+    и обрабатывающий их в целях улучшения изображения для последующей детекции.
 
     Args:
         video_path (str): путь к видеофайлу
@@ -145,9 +145,9 @@ def get_time_from_video_path(
     """
     start_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[1]))
     end_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[2].split('.')[0]))
-
     logger.debug(f'Video: {video_path}, start time: {start_time}, end time: {end_time}')
-    return start_time, end_time
+
+    return (start_time, end_time)
 
 
 def xml_helper(
@@ -155,7 +155,17 @@ def xml_helper(
         end_time: datetime,
         track_id: int
 ) -> str:
-    """ формат lxml файла для передачи параметров поиска файлов"""
+    """
+    Форматирование lxml файла для передачи параметров поиска файлов в API регистратора
+
+    Args:
+        start_time (datetime): время начала поиска
+        end_time (datetime): время окончания поиска
+        track_id (int): идентификатор камеры для регистратора
+    
+    Returns:
+        xml_string (str): отформатированная строка
+    """
 
     max_result = 1300
     search_position = 0
@@ -190,14 +200,16 @@ async def save_frame_img(
 
     Args:
         frame (np.ndarray): кадр
-        detection_time (datetime): время обнаружения
+        detection_time (datetime): время на кадре
     
     Returns:
         filename (str): имя сохраненного файла
     """
+
     filename = f'screenshot_{detection_time.strftime("%m-%d-%Y_%H-%M-%S")}.png'
     saved_img = cv2.imwrite(filename, frame)
     logger.debug(f"\n\n\nImage saved: {saved_img} ({filename})\n\n\n")
+
     return filename
 
 
@@ -208,7 +220,25 @@ async def send_event_info(
     url_json: str = cfg.json_url,
     url_img: str = cfg.img_url,
     auth: str = cfg.json_auth_token
-) -> httpx.Response:
+) -> None:
+    """
+    Функция, отправляющие данные о созданном событие на внешний сервер:
+        - отправляет POST-запрос с данными о событии в формате JSON;
+        - извлекает из ответа ID созданной записи;
+        - отправляет POST-запрос со скриншотом кадра.
+
+    Args:
+        data (str): JSON с данными о событии
+        frame (np.ndarray): кадр из видео
+        detection_time (datetime): время на кадре
+        url_json (str): URL для отправки POST-запроса с данными о событии
+        url_img (str): URL для отправки POST-запроса со скриншотом кадра
+        auth (str): авторизационный токен
+    
+    Returns:
+        None
+    """
+
     headers_json = {
         "Content-Type": "application/json",
         "Authorization": auth
@@ -222,14 +252,18 @@ async def send_event_info(
         async with httpx.AsyncClient() as client:
             timeout = httpx.Timeout(10.0, read=None)
             print('JSON POST request sent...')
+
+            # отправляем POST-запрос с данными о событии
             response = await client.post(url=url_json, headers=headers_json, content=data, timeout=timeout)
 
             if response.status_code == 200 or response.status_code == 201:
                 logger.info(f'JSON POST request sent successfully. Response: {response.text}.')
 
+                # извлекаем из ответа ID созданной записи
                 resp_id = re.search('"id":([0-9]+)', response.text).group(1)
                 logger.debug(f'JSON response ID: {resp_id}')
 
+                # сохраняем файл со скриншотом кадра
                 filename = await save_frame_img(frame=frame, detection_time=detection_time)
                 data = {
                     'holderType': 'manufacturingOperation',
@@ -239,12 +273,15 @@ async def send_event_info(
                     'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
                     'formData': (None, json.dumps(data), 'application/json')
                 }
+
+                # отправляем POST-запрос со скриншотом кадра
                 r = await client.post(url=url_img, headers=headers_img, files=files)
 
                 if response.status_code == 200 or response.status_code == 201:
                     logger.info(f'Image POST request sent successfully. Response: {r.text}.')
 
-                    os.remove(filename)  # check
+                    # удаляем созданный файл
+                    os.remove(filename)
                 else:
                     logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 
@@ -257,15 +294,18 @@ async def send_event_info(
     # return response
 
 
-def create_camera_roi(frame):  # doesn't work here but implemented in "if __name__ == '__main__'"
+def create_camera_roi(
+    frame: np.ndarray
+) -> None:  # doesn't work here but implemented in "if __name__ == '__main__'"
     """
-    Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
+    Функция, позволяющая обозначить на кадре область интереса (ROI) и найти ее координаты.
+    Исполнятеся при вызове с текущей страницы
 
     Args:
-        frame: кадр-образец
+        frame (np.ndarray): кадр-образец
     
     Returns:
-        roi_points (List(tuple)): координаты области интереса
+        Координаты ROI выводятся в терминале
     """
     pass
 
@@ -276,12 +316,13 @@ if __name__ == '__main__':
 
     drawing = False
     roi_points = []
-    frame = "video/1.png"
+    frame = "video/1.png"  # путь к кадру-образцу
 
     frame = cv2.imread(frame)
 
+    # отрисовка ROI на кадре (нажатием левой кнопки мыши задается верхняя левая и нижняя правая точки)
     def draw_roi(event, x, y, flags, param):
-        global roi_points, drawing  # eww
+        global roi_points, drawing  # redo
 
         if event == cv2.EVENT_LBUTTONDOWN:
             drawing = True
@@ -293,7 +334,6 @@ if __name__ == '__main__':
             cv2.rectangle(frame, roi_points[0], roi_points[1], (0, 255, 0), 2)
             cv2.imshow("Frame", frame)
 
-    # Create a window and set the callback function
     cv2.namedWindow("Frame")
     cv2.setMouseCallback("Frame", draw_roi)
 
@@ -302,20 +342,13 @@ if __name__ == '__main__':
         key = cv2.waitKey(1) & 0xFF
 
         if key == ord("r"):
-            # Reset the ROI
+            # сброс заданной ROI
             roi_points = []
             frame = cv2.imread(frame)
         elif key == ord("c"):
-            # Confirm the ROI and proceed with further processing
+            # подтвержение ROI и вывод координат
             break
 
-    # logger.info(roi_points)
-    logger.info(f'Updated ROI coord: {roi_points}') 
+    # вывод координат ROI в терминал
+    print(f'Updated ROI coord: {roi_points}') 
     cv2.destroyAllWindows()
-
-    # async with SessionLocal() as session:
-    #     await Camera.update_camera_roi(
-    #         db_session=session,
-    #         camera_id=1,
-    #         roi_coord=str(roi_points)
-    #     )

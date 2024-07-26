@@ -22,10 +22,11 @@ async def main():
 
     logger.info('App initiated')
 
+    """ инициализация моделей для обучения и обработки отдельных видеофайлов """
     #detector = Detector(mode='det')
     #seg_detector = Detector(mode='seg')
 
-    """ init application """
+    """ инициализация приложения для поиска, скачивания, и обработки видео """
     app = Application()
     app.start()
     try:
@@ -34,13 +35,13 @@ async def main():
     except KeyboardInterrupt:
         app.stop()
 
-    """ create db """
+    """ создание БД """
     # async with db_engine.begin() as conn:
     #     await conn.run_sync(Base.metadata.drop_all)
     #     await conn.run_sync(Base.metadata.create_all)
     #     logger.info('DB metadata created')
 
-    """ train model """
+    """ обучение модели """
     # logger.info(f'Training started')
     # detector.train_custom(
     #     data='datasets/data.yaml',
@@ -50,7 +51,7 @@ async def main():
 
     # detector.augment_dataset_dir()
 
-    """ process video & detect objects """
+    """ обработка отдельного видеофайла """
 
     #await process_video_file(
     #    detector=detector,

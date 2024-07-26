@@ -43,14 +43,17 @@ def extract_frame(
     frame_idx = 0
     frame_count = 0
 
-    while frame_count <= video_frame_count:  # ?
+    # извлечение производится, пока не дойдем до конца видео
+    while frame_count <= video_frame_count:
         ret, frame = video.read()
         if not ret:
             break
+
+        # извлекается каждый Х кадр (если индекс кадра делится без остатка на заданный интервал)
         if frame_idx % frame_interval == 0:
             frame_count += 1
 
-            # adjust contrast
+            # дополнительная настройка яркости и контраста
             brightness = 0
             contrast = 1.2
             gamma = 3
@@ -156,7 +159,7 @@ def xml_helper(
         track_id: int
 ) -> str:
     """
-    Форматирование lxml файла для передачи параметров поиска файлов в API регистратора
+    Форматирование lxml файла для передачи параметров поиска файлов в API видеорегистратора
 
     Args:
         start_time (datetime): время начала поиска

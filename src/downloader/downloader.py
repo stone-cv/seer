@@ -23,8 +23,19 @@ from shared_db_models.models.models import VideoFile
 
 # TODO: check for free space
 
-def unix_time_from_file(file_time: str) -> int:  # copied
-    datetime_obj = datetime.fromisoformat(file_time.replace("Z", "+03:00"))  # Moscow timezone
+def unix_time_from_file(
+        file_time: str
+) -> int:
+    """
+    Функция, конвертирующая время в unix-формат.
+
+    Args:
+        file_time (str): строка со временем в формате ISO
+
+    Returns:
+        int: время в unix-формате
+    """
+    datetime_obj = datetime.fromisoformat(file_time.replace("Z", "+03:00"))  # Moscow timezone. TODO rm hardcode
     return int(datetime_obj.timestamp())
 
 
@@ -35,12 +46,16 @@ async def get_files_list(
     end_time: datetime
 ) -> dict:
     """
+    Функция, позволяющая найти на видеорегистраторе файлы в заданном диапазоне времени
 
-    :param channel: Номер канала в формате TrackID.
-    :param start_time: Дата начала периода запроса в формате datetime.
-    :param end_time: Дата окончания периода запроса в формате datetime.
-    :param  recorder
-    :return: Словарь с данными с видеорегистратора.
+    Args:
+        channel (int): ID канала (камеры) в формате TrackID
+        recorder_ip (str): IP-адрес видеорегистратора
+        start_time (datetime): начало запрашиваемого периода
+        end_time (datetime): окончание запрашиваемого периода
+    
+    Returns:
+        files_dict (dict): словарь с полученными данными о видеофайлах
     """
 
     files_dict = {}
@@ -54,7 +69,7 @@ async def get_files_list(
     async with httpx.AsyncClient() as client:
         while retry_count <= 10 and not success:
             try:
-                # перевод xml в json
+                # отправка запроса с заданными параметрами
                 response = await client.post(
                     api_url,
                     auth=httpx.DigestAuth(username=cfg.cam_login, password=cfg.cam_password),
@@ -81,12 +96,14 @@ async def get_files_list(
     
     if success:
         # TODO: Add 401 response handle
+
+        # парсинг ответа с данными о видеофайлах
         root = etree.fromstring(response.text.replace('<?xml version="1.0" encoding="UTF-8" ?>\n', ''))
         logger.debug(root)
         items = []
 
         if len(root.getchildren()) > 4:
-            video_list = root.getchildren()[4].getchildren()[:-1]  # the last file is still being recorded
+            video_list = root.getchildren()[4].getchildren()[:-1]  # не берем последний элемент, т.к. этот видеофайл еще в процессе записи
             for match in video_list:
                 data = {}
                 for el in match.getchildren():
@@ -108,22 +125,35 @@ async def get_files_list(
                     continue
                 items.append(data)
 
-        files_dict[channel] = items  # Формируем словарь {номер канала: [данные с регистратора]}
+        # формируем словарь {номер канала: [данные с регистратора]}
+        files_dict[channel] = items
         logger.debug(f'{len(files_dict[channel])} file(s) retrieved for download: {files_dict}')
 
         return files_dict
 
 
 async def download_files(
-        channel: int,
+        # channel: int,
         recorder_ip: str,
         file_id: int,
         data: dict
-) -> None:
+) -> VideoFile:
+    """
+    Функция, скачивающая файлы с видеорегистратора
 
-    # for data in files_dict[channel]:
+    Args:
+        recorder_ip (str): IP-адрес видеорегистратора
+        file_id (int): ID видеофайла в БД
+        data (dict): словарь с данными о видеофайле
+    
+    Returns:
+        videofile (VideoFile): объект видеофайла
+    """
+    # название папки для хранения файлов (== дата видеозаписи)
+    date_folder_name = f"{data['startTime'][:10]}"
 
-    date_folder_name = f"{data['startTime'][:10]}"  # redo
+    # название сохраняемого файла в формате:
+    # <номер канала>_<время начала видеофрагмента>_<время окончания видеофрагмента>.<расширение>
     file_name = f"{data['trackID']}_{unix_time_from_file(data['startTime'])}_{unix_time_from_file(data['endTime'])}.mp4"
 
     reg_path = f'{cfg.download_dir}/{date_folder_name}'
@@ -135,7 +165,7 @@ async def download_files(
 
     download_start = datetime.now()
 
-    # Начинаем загрузку файлов
+    # параметры загрузки файлов
     api_url = f'http://{recorder_ip}/ISAPI/'
     download_url = api_url + 'ContentMgmt/download'
     playback_uri = data['playbackURI']
@@ -149,6 +179,7 @@ async def download_files(
     async with httpx.AsyncClient() as client:
         while retry_count <= 10 and not success:
             try:
+                # отправка запроса на скачивание видеофайла
                 async with client.stream(
                     'POST',
                     download_url,
@@ -167,11 +198,10 @@ async def download_files(
                         continue
 
                     total_size_in_bytes = int(response.headers.get('content-length', 0))
-
                     logger.debug(f"File size: {total_size_in_bytes} bytes")
-
                     bt = perf_counter()
 
+                    # сохранение скачиваемого видео в файл
                     async with aiofiles.open(data_filepath, 'wb') as video_file:
                         progress_bar = tqdm(total=total_size_in_bytes, unit='B', unit_scale=True)
 
@@ -195,6 +225,7 @@ async def download_files(
             await asyncio.sleep(5)
     
     if success:
+        # обновляем запись о видеофайле в БД
         async with SessionLocal() as session:
             videofile = await VideoFile.update(
                     db_session=session,

@@ -9,8 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from alembic import context
 
-from core.database import Base
-from core.database import db_URI
+from shared_db_models.database import Base
+from shared_db_models.database import db_URI
 from core.models import *
 
 

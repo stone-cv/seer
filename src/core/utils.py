@@ -1,15 +1,19 @@
 import os
+import re
 import cv2
 import uuid
+import json
 import httpx
+import traceback
+import numpy as np
 from datetime import datetime
 from typing import Any
 from typing import List
 
 import core.config as cfg
 from core.logger import logger
-from core.models import Camera
-from core.database import SessionLocal
+from shared_db_models.models.models import Camera
+from shared_db_models.database import SessionLocal
 
 
 def extract_frame(
@@ -19,7 +23,7 @@ def extract_frame(
 ) -> Any:
     """
     Генератор, извлекающий из видео заданное количество кадров в секунду
-    и обрезающий кадры под размер области интереса.
+    и обрабатывающий их в целях улучшения изображения для последующей детекции.
 
     Args:
         video_path (str): путь к видеофайлу
@@ -39,12 +43,37 @@ def extract_frame(
     frame_idx = 0
     frame_count = 0
 
+    # извлечение производится, пока не дойдем до конца видео
     while frame_count <= video_frame_count:
         ret, frame = video.read()
         if not ret:
             break
+
+        # извлекается каждый Х кадр (если индекс кадра делится без остатка на заданный интервал)
         if frame_idx % frame_interval == 0:
             frame_count += 1
+
+            # дополнительная настройка яркости и контраста
+            brightness = 0
+            contrast = 1.2
+            gamma = 3
+            frame = cv2.addWeighted(frame, contrast, np.zeros(frame.shape, frame.dtype), gamma, brightness)
+
+            # # Sharpen the image 
+            # kernel = np.array([[0, -1, 0], [-1, 5, -1], [0, -1, 0]])
+            # frame = cv2.filter2D(frame, -1, kernel)
+
+            # # adjust color
+            # # Convert the image from BGR to HSV color space 
+            # frame = cv2.cvtColor(frame, cv2.COLOR_RGB2HSV) 
+            # # Adjusts the hue by multiplying it by 0.7 
+            # frame[:, :, 0] = frame[:, :, 0] * 1
+            # # Adjusts the saturation by multiplying it by 1.5 
+            # frame[:, :, 1] = frame[:, :, 1] * 1.5  # ! 1.5
+            # # Adjusts the value by multiplying it by 0.5 
+            # frame[:, :, 2] = frame[:, :, 2] * 1
+            # # Convert the image back to BGR color space 
+            # frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR) 
 
             # scale_factor = 0.5
             # frame = cv2.resize(frame, None, fx=scale_factor, fy=scale_factor)
@@ -104,7 +133,7 @@ async def crop_images_in_folder(
 
 def get_time_from_video_path(
         video_path: str
-) -> (datetime, datetime):
+) -> tuple[datetime, datetime]:
     """
     Функция, позволяющая извлечь из названия видеофайла время начала и
     окончания видеофрагмента (при условии соблюдения конвенций для наименования файлов:
@@ -119,75 +148,167 @@ def get_time_from_video_path(
     """
     start_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[1]))
     end_time = datetime.fromtimestamp(int(video_path.split('/')[-1].split('_')[2].split('.')[0]))
-
     logger.debug(f'Video: {video_path}, start time: {start_time}, end time: {end_time}')
-    return start_time, end_time
+
+    return (start_time, end_time)
 
 
-# def xml_helper(
-#         start_time: datetime,
-#         end_time: datetime,
-#         track_id: int
-# ) -> str:
-#     """ формат lxml файла для передачи параметров поиска файлов"""
+def xml_helper(
+        start_time: datetime,
+        end_time: datetime,
+        track_id: int
+) -> str:
+    """
+    Форматирование lxml файла для передачи параметров поиска файлов в API видеорегистратора
 
-#     max_result = 1300
-#     search_position = 0
-#     search_id = uuid.uuid4()
-#     metadata = '//recordType.meta.std-cgi.com'
+    Args:
+        start_time (datetime): время начала поиска
+        end_time (datetime): время окончания поиска
+        track_id (int): идентификатор камеры для регистратора
+    
+    Returns:
+        xml_string (str): отформатированная строка
+    """
 
-#     if isinstance(start_time, (datetime, datetime.date)): # Пока грубая проверка. В следующей версии будет все на Typing и передаваться будет строго datetime.
-#         start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    max_result = 1300
+    search_position = 0
+    search_id = uuid.uuid4()
+    metadata = '//recordType.meta.std-cgi.com'
 
-#     if isinstance(end_time, datetime):
-#         end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
+    if isinstance(start_time, (datetime, datetime.date)): # TODO Typing & datetime
+        start_time = start_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-#     xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
-#             f'<trackList><trackID>{track_id}</trackID></trackList>' \
-#             f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
-#             f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
-#             f'<maxResults>{max_result}</maxResults>' \
-#             f'<searchResultPostion>{search_position}</searchResultPostion>' \
-#             f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
-#             f'</CMSearchDescription> '
-#     logger.debug(f'XML string: {xml_string}')
+    if isinstance(end_time, datetime):
+        end_time = end_time.strftime('%Y-%m-%dT%H:%M:%SZ')
 
-#     return xml_string
+    xml_string = f'<?xml version="1.0" encoding="utf-8"?><CMSearchDescription><searchID>{search_id}</searchID>' \
+            f'<trackList><trackID>{track_id}</trackID></trackList>' \
+            f'<timeSpanList><timeSpan><startTime>{start_time}</startTime>' \
+            f'<endTime>{end_time}</endTime></timeSpan></timeSpanList>' \
+            f'<maxResults>{max_result}</maxResults>' \
+            f'<searchResultPostion>{search_position}</searchResultPostion>' \
+            f'<metadataList><metadataDescriptor>{metadata}</metadataDescriptor></metadataList>' \
+            f'</CMSearchDescription> '
+    logger.debug(f'XML string: {xml_string}')
+
+    return xml_string
 
 
-async def send_event_json(
+async def save_frame_img(
+    frame: np.ndarray,
+    detection_time: datetime
+) -> str:
+    """
+    Сохранение кадра в файл (изображение)
+
+    Args:
+        frame (np.ndarray): кадр
+        detection_time (datetime): время на кадре
+    
+    Returns:
+        filename (str): имя сохраненного файла
+    """
+
+    filename = f'screenshot_{detection_time.strftime("%m-%d-%Y_%H-%M-%S")}.png'
+    saved_img = cv2.imwrite(filename, frame)
+    logger.debug(f"\n\n\nImage saved: {saved_img} ({filename})\n\n\n")
+
+    return filename
+
+
+async def send_event_info(
     data: str,
-    url: str = cfg.json_url,
+    frame: np.ndarray,
+    detection_time: datetime,
+    url_json: str = cfg.json_url,
+    url_img: str = cfg.img_url,
     auth: str = cfg.json_auth_token
-) -> httpx.Response:
-    headers = {
+) -> None:
+    """
+    Функция, отправляющие данные о созданном событие на внешний сервер:
+        - отправляет POST-запрос с данными о событии в формате JSON;
+        - извлекает из ответа ID созданной записи;
+        - отправляет POST-запрос со скриншотом кадра.
+
+    Args:
+        data (str): JSON с данными о событии
+        frame (np.ndarray): кадр из видео
+        detection_time (datetime): время на кадре
+        url_json (str): URL для отправки POST-запроса с данными о событии
+        url_img (str): URL для отправки POST-запроса со скриншотом кадра
+        auth (str): авторизационный токен
+    
+    Returns:
+        None
+    """
+
+    headers_json = {
         "Content-Type": "application/json",
         "Authorization": auth
     }
+
+    headers_img = {
+        "Authorization": auth
+    }
+
     try:
         async with httpx.AsyncClient() as client:
-            response = await client.post(url=url, headers=headers, content=data)
+            timeout = httpx.Timeout(10.0, read=None)
+            print('JSON POST request sent...')
+
+            # отправляем POST-запрос с данными о событии
+            response = await client.post(url=url_json, headers=headers_json, content=data, timeout=timeout)
 
             if response.status_code == 200 or response.status_code == 201:
-                logger.info(f'JSON POST request sent successfully. Response: {response.text}')
+                logger.info(f'JSON POST request sent successfully. Response: {response.text}.')
+
+                # извлекаем из ответа ID созданной записи
+                resp_id = re.search('"id":([0-9]+)', response.text).group(1)
+                logger.debug(f'JSON response ID: {resp_id}')
+
+                # сохраняем файл со скриншотом кадра
+                filename = await save_frame_img(frame=frame, detection_time=detection_time)
+                data = {
+                    'holderType': 'manufacturingOperation',
+                    'manufacturingOperationId': resp_id
+                }
+                files = {
+                    'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
+                    'formData': (None, json.dumps(data), 'application/json')
+                }
+
+                # отправляем POST-запрос со скриншотом кадра
+                r = await client.post(url=url_img, headers=headers_img, files=files)
+
+                if response.status_code == 200 or response.status_code == 201:
+                    logger.info(f'Image POST request sent successfully. Response: {r.text}.')
+
+                    # удаляем созданный файл
+                    os.remove(filename)
+                else:
+                    logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
+
             else:
                 logger.error(f'JSON POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 
     except Exception as exc:
-        logger.error(exc)
+        logger.error(f'{exc} {traceback.format_exc()}')
 
     # return response
 
 
-def create_camera_roi(frame) -> list():  # doesn't work here but implemented in "if __name__ == '__main__'"
+def create_camera_roi(
+    frame: np.ndarray
+) -> None:  # doesn't work here but implemented in "if __name__ == '__main__'"
     """
-    Функция, позволяющая обозначить на кадре область интереса и найти ее координаты.
+    Функция, позволяющая обозначить на кадре область интереса (ROI) и найти ее координаты.
+    Исполнятеся при вызове с текущей страницы
 
     Args:
-        frame: кадр-образец
+        frame (np.ndarray): кадр-образец
     
     Returns:
-        roi_points (List(tuple)): координаты области интереса
+        Координаты ROI выводятся в терминале
     """
     pass
 
@@ -198,12 +319,13 @@ if __name__ == '__main__':
 
     drawing = False
     roi_points = []
-    frame = "../static/1.png"
+    frame = "video/1.png"  # путь к кадру-образцу
 
     frame = cv2.imread(frame)
 
+    # отрисовка ROI на кадре (нажатием левой кнопки мыши задается верхняя левая и нижняя правая точки)
     def draw_roi(event, x, y, flags, param):
-        global roi_points, drawing  # eww
+        global roi_points, drawing  # redo
 
         if event == cv2.EVENT_LBUTTONDOWN:
             drawing = True
@@ -215,7 +337,6 @@ if __name__ == '__main__':
             cv2.rectangle(frame, roi_points[0], roi_points[1], (0, 255, 0), 2)
             cv2.imshow("Frame", frame)
 
-    # Create a window and set the callback function
     cv2.namedWindow("Frame")
     cv2.setMouseCallback("Frame", draw_roi)
 
@@ -224,20 +345,13 @@ if __name__ == '__main__':
         key = cv2.waitKey(1) & 0xFF
 
         if key == ord("r"):
-            # Reset the ROI
+            # сброс заданной ROI
             roi_points = []
             frame = cv2.imread(frame)
         elif key == ord("c"):
-            # Confirm the ROI and proceed with further processing
+            # подтвержение ROI и вывод координат
             break
 
-    # logger.info(roi_points)
+    # вывод координат ROI в терминал
     print(f'Updated ROI coord: {roi_points}') 
     cv2.destroyAllWindows()
-
-    # async with SessionLocal() as session:
-    #     await Camera.update_camera_roi(
-    #         db_session=session,
-    #         camera_id=1,
-    #         roi_coord=str(roi_points)
-    #     )

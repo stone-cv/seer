@@ -27,9 +27,9 @@ class Detector:
        
         self.capture_index = capture_index
         
-        # self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
-        self.device = 'mps'  # 'cpu'
-        print("Using Device: ", self.device)
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        # self.device = 'mps'  # 'cpu'
+        logger.info("Using Device: ", self.device)
         
         self.model = self.load_model(mode)
         
@@ -169,7 +169,7 @@ class Detector:
             device=self.device,
             # tracker="bytetrack.yaml",
             # stream=True,
-            show=True
+            # show=True
         )
 
         return results

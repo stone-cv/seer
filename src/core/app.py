@@ -243,12 +243,12 @@ class Application:
 
             finally:
                 logger.debug(f'File {video_file.id} downloaded')
-                # async with SessionLocal() as session:
-                #     await VideoFile.update(
-                #         db_session=session,
-                #         id=file_id,
-                #         is_downloaded=True
-                #     )
+                async with SessionLocal() as session:
+                    await VideoFile.update(
+                        db_session=session,
+                        id=file_id,
+                        is_downloaded=True
+                    )
 
                 # добавляем путь к файлу (+ его ID в БД) в очередь для обработки видео
                 await self.queue_process_video.put((filepath, video_file.id))

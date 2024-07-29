@@ -119,7 +119,7 @@ async def process_video_file(
                                     curr_fps=curr_fps,
                                     detection_time=detection_time,
                                     camera_id=camera_id,
-                                    frame=frame
+                                    # frame=frame
                                 )
                                 if saw_event:
                                     event_list.append(saw_event)
@@ -137,7 +137,7 @@ async def process_video_file(
                         curr_fps=curr_fps,
                         detection_time=detection_time,
                         camera_id=camera_id,
-                        frame=frame
+                        # frame=frame
                     )
                     if stone_event:  #and stone_event.type_id != 2:
                         event_list.append(stone_event)

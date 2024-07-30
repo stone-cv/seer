@@ -173,7 +173,7 @@ async def process_video_file(
 
                                     event = await Event.update(
                                         db_session=session,
-                                        event_id=event.id,
+                                        id=event.id,
                                         stone_area=str(stone_area)
                                     )
 

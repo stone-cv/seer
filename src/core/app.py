@@ -19,8 +19,8 @@ from shared_db_models.models.models import VideoFile
 class Application:
     def __init__(self):
         self.status: int = 0  # 0 - stopped, 1 - running
-        self.detector: Detector = Detector(capture_index=0, mode='det')
-        self.detector_seg: Detector = Detector(capture_index=0, mode='seg')
+        self.detector: Detector = Detector(mode='det')
+        self.detector_seg: Detector = Detector(mode='seg')
         self.camera_id: int = cfg.camera_id
         self.cam_track_id: int = None  # TODO
         self.queue_search_video: asyncio.Queue = asyncio.Queue()

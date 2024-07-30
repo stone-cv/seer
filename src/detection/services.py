@@ -15,6 +15,7 @@ from core.utils import send_event_info
 from core.utils import get_time_from_video_path
 from detection.detector.detector import Detector
 from shared_db_models.models.models import Event
+from shared_db_models.models.models import EventType
 from shared_db_models.models.models import Camera
 from shared_db_models.database import SessionLocal
 
@@ -119,7 +120,6 @@ async def process_video_file(
                                     curr_fps=curr_fps,
                                     detection_time=detection_time,
                                     camera_id=camera_id,
-                                    # frame=frame
                                 )
                                 if saw_event:
                                     event_list.append(saw_event)
@@ -415,7 +415,7 @@ async def check_for_motion(
             elif in_motion and not already_moving:
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=3,  # событие "Начало распила товарного блока". TODO rm hardcoded id
+                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Начало распила товарного блока'),
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -426,7 +426,7 @@ async def check_for_motion(
             elif not in_motion and already_moving:
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=4,  # событие "Окончание распила товарного блока". TODO rm hardcoded id
+                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Окончание распила товарного блока'),
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -531,7 +531,7 @@ async def check_if_stone_present_or_transferred(
 
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=1,  # событие "Новый товарный блок на станке". TODO rm hardcoded id
+                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Новый товарный блок на станке'),
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -559,7 +559,7 @@ async def check_if_stone_present_or_transferred(
 
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=2,  # событие "Товарный блок убран со станка". TODO rm hardcoded id
+                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Товарный блок убран со станка'),
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -578,7 +578,7 @@ async def check_if_stone_present_or_transferred(
 
         event = await Event.create(
             db_session=db_session,
-            type_id=1,  # событие "Новый товарный блок на станке". TODO rm hardcoded id
+            type_id=await EventType.get_id_by_name(db_session=db_session, name='Новый товарный блок на станке'),
             camera_id=camera_id,
             time=detection_time-timedelta(minutes=1)
         )
@@ -594,7 +594,7 @@ async def check_if_stone_present_or_transferred(
 
         event = await Event.create(
             db_session=db_session,
-            type_id=2,  # событие "Товарный блок убран со станка". TODO rm hardcoded id
+            type_id=await EventType.get_id_by_name(db_session=db_session, name='Товарный блок убран со станка'),
             camera_id=camera_id,
             time=detection_time-timedelta(minutes=1)
         )

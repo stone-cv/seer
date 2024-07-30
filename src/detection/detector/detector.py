@@ -35,7 +35,6 @@ class Detector:
         
         self.class_names_dict = self.model.model.names
         self.class_ids_dict = {val: key for key, val in self.class_names_dict.items()}
-        print(self.class_ids_dict)
     
         # self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
 

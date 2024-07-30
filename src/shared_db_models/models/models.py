@@ -238,6 +238,22 @@ class EventType(BaseCRUD):
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
+    @staticmethod
+    async def get_id_by_name(
+        db_session: AsyncSession,
+        name: str
+    ) -> int:
+
+        event_type = await db_session.execute(
+            select(EventType).filter(
+                EventType.name == name
+            )
+        )
+        event_type = event_type.scalars().first()
+        logger.debug(f'Event type id for {name}: {event_type.id}')
+
+        return event_type.id
+
 
 class VideoFile(BaseCRUD):
     __tablename__ = "video_files"

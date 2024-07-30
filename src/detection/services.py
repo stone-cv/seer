@@ -110,8 +110,8 @@ async def process_video_file(
                             class_ids.append(item['class_id'])
 
                             # логика, относящаяся к пиле: проверка на движение
-                            logger.info(detector.class_ids_dict['saw'] + type(detector.class_ids_dict['saw']))
-                            logger.info(item['class_id'] + type(item['class_id']))
+                            logger.info(f'{detector.class_ids_dict['saw']} + {type(detector.class_ids_dict['saw'])}')
+                            logger.info(f'{item['class_id']} + {type(item['class_id'])}')
                             if item['class_id'] == detector.class_ids_dict['saw']:
                                 saw_track_magn, saw_already_moving, saw_event = await check_for_motion(
                                     db_session=session,

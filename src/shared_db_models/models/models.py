@@ -21,7 +21,7 @@ from shared_db_models.database import Base
 from shared_db_models.models.base_model import BaseCRUD
 
 
-class Camera(Base):
+class Camera(BaseCRUD):
     __tablename__ = "cameras"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -36,66 +36,27 @@ class Camera(Base):
     roi: Mapped[str] = mapped_column(String(255))
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    @staticmethod
-    async def camera_create(
-        *,
-        db_session: AsyncSession,
-        name: str,
-        url: str,
-        roi_coord: str
-    ) -> 'Camera':
-
-        camera = Camera(
-            name=name,
-            url=url,
-            roi_coord=roi_coord
-        )
-
-        db_session.add(camera)
-        await db_session.commit()
-
-        return camera
-
-    @staticmethod
-    async def camera_delete(
-        *,
-        db_session: AsyncSession,
-        camera_id: int
-    ) -> 'Camera':
-
-        camera = await db_session.execute(
-            select(Camera).filter(
-                Camera.id == camera_id
-            )
-        )
-
-        camera = camera.scalars().first()
-        camera.deleted = True
-        await db_session.commit()
-
-        return camera
     
-    @staticmethod
-    async def update_camera_roi(
-        *,
-        db_session: AsyncSession,
-        camera_id: int,
-        roi_coord: str
-    ) -> str:
+    # @staticmethod
+    # async def update_camera_roi(
+    #     *,
+    #     db_session: AsyncSession,
+    #     camera_id: int,
+    #     roi_coord: str
+    # ) -> str:
 
-        camera = await db_session.execute(
-            select(Camera).filter(
-                Camera.id == camera_id
-            )
-        )
-        camera = camera.scalars().first()
-        camera.roi = roi_coord
-        logger.info(f'Camera {camera_id} ROI updated: {camera.roi}')
+    #     camera = await db_session.execute(
+    #         select(Camera).filter(
+    #             Camera.id == camera_id
+    #         )
+    #     )
+    #     camera = camera.scalars().first()
+    #     camera.roi = roi_coord
+    #     logger.info(f'Camera {camera_id} ROI updated: {camera.roi}')
 
-        await db_session.commit()
+    #     await db_session.commit()
 
-        return camera
+    #     return camera
     
     @staticmethod
     async def get_url_by_camera_id(
@@ -168,7 +129,7 @@ class Camera(Base):
         return track_id
 
 
-class Event(Base):
+class Event(BaseCRUD):
     __tablename__ = "events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -181,63 +142,63 @@ class Event(Base):
 
     time: Mapped[DateTime] = mapped_column(DateTime)
 
-    machine: Mapped[str] = mapped_column(String, nullable=True)
-    stone_number: Mapped[int] = mapped_column(Integer, nullable=True)
-    stone_area: Mapped[str] = mapped_column(String, nullable=True)
-    comment: Mapped[str] = mapped_column(String, nullable=True)
+    machine: Mapped[str] = mapped_column(String, default='PW1TK 3000', nullable=True)
+    stone_number: Mapped[int] = mapped_column(Integer, default=1, nullable=True)
+    stone_area: Mapped[str] = mapped_column(String, default='0', nullable=True)
+    comment: Mapped[str] = mapped_column(String, default='см2', nullable=True)
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    @staticmethod
-    async def event_create(
-        *,
-        db_session: AsyncSession,
-        type_id: int,
-        camera_id: int,
-        time: datetime,
-        machine: Optional[str] = 'PW1TK 3000',
-        stone_number: Optional[int] = 1,
-        stone_area: Optional[str] = '0',
-        comment: Optional[str] = 'см2'
-    ) -> 'Event':
+    # @staticmethod
+    # async def event_create(
+    #     *,
+    #     db_session: AsyncSession,
+    #     type_id: int,
+    #     camera_id: int,
+    #     time: datetime,
+    #     machine: Optional[str] = 'PW1TK 3000',
+    #     stone_number: Optional[int] = 1,
+    #     stone_area: Optional[str] = '0',
+    #     comment: Optional[str] = 'см2'
+    # ) -> 'Event':
 
-        event = Event(
-            type_id=type_id,
-            camera_id=camera_id,
-            time=time,
-            machine=machine,
-            stone_number=stone_number,
-            stone_area=stone_area,
-            comment=comment
-        )
+    #     event = Event(
+    #         type_id=type_id,
+    #         camera_id=camera_id,
+    #         time=time,
+    #         machine=machine,
+    #         stone_number=stone_number,
+    #         stone_area=stone_area,
+    #         comment=comment
+    #     )
 
-        db_session.add(event)
-        await db_session.commit()
+    #     db_session.add(event)
+    #     await db_session.commit()
 
-        logger.debug(f'Event created: {event.__dict__}')
+    #     logger.debug(f'Event created: {event.__dict__}')
 
-        return event
+    #     return event
     
-    @staticmethod
-    async def event_update_stone_area(
-        *,
-        db_session: AsyncSession,
-        event_id: int,
-        stone_area: str
-    ) -> str:
+    # @staticmethod
+    # async def event_update_stone_area(
+    #     *,
+    #     db_session: AsyncSession,
+    #     event_id: int,
+    #     stone_area: str
+    # ) -> str:
 
-        event = await db_session.execute(
-            select(Event).filter(
-                Event.id == event_id
-            )
-        )
-        event = event.scalars().first()
-        event.stone_area = stone_area
-        logger.info(f'Event {event_id} stone area updated: {event.stone_area}')
+    #     event = await db_session.execute(
+    #         select(Event).filter(
+    #             Event.id == event_id
+    #         )
+    #     )
+    #     event = event.scalars().first()
+    #     event.stone_area = stone_area
+    #     logger.info(f'Event {event_id} stone area updated: {event.stone_area}')
 
-        await db_session.commit()
+    #     await db_session.commit()
 
-        return event
+    #     return event
     
     @staticmethod
     async def convert_event_to_json(
@@ -246,9 +207,9 @@ class Event(Base):
         event: 'Event'
     ):
 
-        event_type = await EventType.get_type_by_id(
+        event_type = await EventType.get_by_id(
             db_session=db_session,
-            type_id=event.type_id
+            id=event.type_id
         )
 
         if not event.stone_area:
@@ -266,27 +227,8 @@ class Event(Base):
 
         return event_json
 
-    @staticmethod
-    async def event_delete(
-        *,
-        db_session: AsyncSession,
-        event_id: int
-    ) -> 'Event':
 
-        event = await db_session.execute(
-            select(Event).filter(
-                Event.id == event_id
-            )
-        )
-
-        event = event.scalars().first()
-        event.deleted = True
-        await db_session.commit()
-
-        return event
-
-
-class EventType(Base):
+class EventType(BaseCRUD):
     __tablename__ = "event_types"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -295,22 +237,6 @@ class EventType(Base):
     event: Mapped['Event'] = relationship(back_populates="event_type")
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    @staticmethod
-    async def get_type_by_id(
-        *,
-        db_session: AsyncSession,
-        type_id: int
-    ) -> 'EventType':
-
-        event_type = await db_session.execute(
-            select(EventType).filter(
-                EventType.id == type_id
-            )
-        )
-
-        event_type = event_type.scalars().first()
-        return event_type
 
 
 class VideoFile(BaseCRUD):
@@ -324,15 +250,15 @@ class VideoFile(BaseCRUD):
     path: Mapped[str] = mapped_column(String, nullable=False)
     playback_uri: Mapped[str] = mapped_column(String, nullable=True)
     vid_start: Mapped[DateTime] = mapped_column(DateTime, nullable=False)  # timestamp?
-    vid_end: Mapped[DateTime] = mapped_column(DateTime, nullable=False)  # timestamp?
+    vid_end: Mapped[DateTime] = mapped_column(DateTime, nullable=False)
 
     is_downloaded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    download_start: Mapped[DateTime] = mapped_column(DateTime, nullable=True)  # timestamp?
-    download_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)  # timestamp?
+    download_start: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    download_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
 
     is_processed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    det_start: Mapped[DateTime] = mapped_column(DateTime, nullable=True)  # timestamp?
-    det_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)  # timestamp?
+    det_start: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
+    det_end: Mapped[DateTime] = mapped_column(DateTime, nullable=True)
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
@@ -372,7 +298,7 @@ class VideoFile(BaseCRUD):
         return files
     
 
-class DailyCamCheck(Base):
+class DailyCamCheck(BaseCRUD):
     __tablename__ = "daily_cam_check"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -385,33 +311,8 @@ class DailyCamCheck(Base):
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    @staticmethod
-    async def daily_cam_check_create(
-        *,
-        db_session: AsyncSession,
-        camera_id: int,
-        date: datetime.date,
-        is_processed: bool,
-        deleted: bool = False
-    ) -> 'DailyCamCheck':
 
-        data = DailyCamCheck(
-            camera_id=camera_id,
-            date=date,
-            is_processed=is_processed,
-            deleted=deleted
-        )
-
-        db_session.add(data)
-        await db_session.commit()
-
-        logger.info(f'Daily check complete for camera {camera_id}: {is_processed}')
-        logger.debug(f'Daily one cam check event: {data.__dict__}')
-
-        return data
-
-
-class DailyAllCamCheck(Base):
+class DailyAllCamCheck(BaseCRUD):
     __tablename__ = "daily_all_cam_check"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -420,26 +321,3 @@ class DailyAllCamCheck(Base):
     is_processed: Mapped[bool] = mapped_column(Boolean)
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    @staticmethod
-    async def daily_all_cam_check_create(
-        *,
-        db_session: AsyncSession,
-        date: datetime.date,
-        is_processed: bool,
-        deleted: bool = False
-    ) -> 'DailyAllCamCheck':
-
-        data = DailyAllCamCheck(
-            date=date,
-            is_processed=is_processed,
-            deleted=deleted
-        )
-
-        db_session.add(data)
-        await db_session.commit()
-
-        logger.info(f'Daily check complete for all cameras: {is_processed}')
-        logger.debug(f'Daily all cam check event: {data.__dict__}')
-
-        return data

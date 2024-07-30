@@ -266,27 +266,28 @@ async def send_event_info(
                 resp_id = re.search('"id":([0-9]+)', response.text).group(1)
                 logger.debug(f'JSON response ID: {resp_id}')
 
-                # сохраняем файл со скриншотом кадра
-                filename = await save_frame_img(frame=frame, detection_time=detection_time)
-                data = {
-                    'holderType': 'manufacturingOperation',
-                    'manufacturingOperationId': resp_id
-                }
-                files = {
-                    'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
-                    'formData': (None, json.dumps(data), 'application/json')
-                }
+                if cfg.send_img:
+                    # сохраняем файл со скриншотом кадра
+                    filename = await save_frame_img(frame=frame, detection_time=detection_time)
+                    data = {
+                        'holderType': 'manufacturingOperation',
+                        'manufacturingOperationId': resp_id
+                    }
+                    files = {
+                        'file': (filename, open(filename, 'rb'), 'application/octet-stream'),
+                        'formData': (None, json.dumps(data), 'application/json')
+                    }
 
-                # отправляем POST-запрос со скриншотом кадра
-                r = await client.post(url=url_img, headers=headers_img, files=files)
+                    # отправляем POST-запрос со скриншотом кадра
+                    r = await client.post(url=url_img, headers=headers_img, files=files)
 
-                if response.status_code == 200 or response.status_code == 201:
-                    logger.info(f'Image POST request sent successfully. Response: {r.text}.')
+                    if response.status_code == 200 or response.status_code == 201:
+                        logger.info(f'Image POST request sent successfully. Response: {r.text}.')
 
-                    # удаляем созданный файл
-                    os.remove(filename)
-                else:
-                    logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
+                        # удаляем созданный файл
+                        os.remove(filename)
+                    else:
+                        logger.error(f'Image POST request failed.\nResponse status code: {response.status_code}, {response.text}')
 
             else:
                 logger.error(f'JSON POST request failed.\nResponse status code: {response.status_code}, {response.text}')

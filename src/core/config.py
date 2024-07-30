@@ -2,8 +2,6 @@ import os
 import yaml
 from pydantic import PostgresDsn
 
-# from logger import logger  -- circular import
-
 
 # load config from env
 if os.getenv('CONFIG', None) is None:
@@ -19,23 +17,26 @@ with open(config_path,"r") as file_object:
 
 # config_dict[section_name].update({field_name:field_value})
 
+
+# Application
 app_name = config['Application']['app_name']
 DEBUG = config['Application']['DEBUG']
 log_dir = config['Application']['log_dir']
-results_dir = config['Application']['results_dir']
+# results_dir = config['Application']['results_dir']
 download_dir = config['Application']['download_dir']
 video_path = config['Application']['video_path']
 required_fps = config['Application']['required_fps']
-weights_det = config['Application']['weights_det']
-weights_seg = config['Application']['weights_seg']
 deep_archive = config['Application']['deep_archive']
 delay = config['Application']['delay']
-# processing_stopped_at = config['Application']['processing_stopped_at']
+weights_det = config['Application']['weights_det']
+weights_seg = config['Application']['weights_seg']
 
-send_json = config['Application']['send_json']
-json_url = config['Application']['json_url']
-img_url = config['Application']['img_url']
-json_auth_token = config['Application']['json_auth_token']
+# API
+send_json = config['API_info']['send_json']
+send_img = config['API_info']['send_img']
+json_url = config['API_info']['json_url']
+img_url = config['API_info']['img_url']
+json_auth_token = config['API_info']['json_auth_token']
 
 # camera auth
 cam_login = config['Camera_auth']['login']

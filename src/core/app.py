@@ -199,7 +199,7 @@ class Application:
                                 )
                             
                             # складываем данные о файле (+ его ID в БД) в очередь для загрузки видео
-                            await self.queue_download_video.put((item, video_file.id))
+                            await self.queue_download_video.put((item, video_file))
                             break
 
             except Exception as exc:
@@ -213,16 +213,10 @@ class Application:
         """
         while True:
             # извлекаем из очереди данные о файле
-            video_item, file_id = await self.queue_download_video.get()
+            video_item, video_file = await self.queue_download_video.get()
+            logger.debug(f'File {video_file.id} retrieved for downloading')
 
             try:
-                async with SessionLocal() as session:
-                    video_file = await VideoFile.get_by_id(
-                        db_session=session,
-                        id=file_id
-                    )
-                    logger.debug(f'File {video_file.id} retrieved for downloading')
-
                 # проверяем, не был ли файл загружен ранее и есть ли в БД запись о его пути
                 if video_file.is_downloaded and video_file.path and video_file.path != 'TBD':
                     logger.debug(f'File {video_file.id} already downloaded')
@@ -234,7 +228,7 @@ class Application:
                     filepath = await download_files(
                         # channel=cfg.channel,
                         recorder_ip=cfg.recorder_ip,
-                        file_id=file_id,
+                        file_id=video_file.id,
                         data=video_item
                     )
 
@@ -246,7 +240,7 @@ class Application:
                 async with SessionLocal() as session:
                     await VideoFile.update(
                         db_session=session,
-                        id=file_id,
+                        id=video_file.id,
                         is_downloaded=True
                     )
 

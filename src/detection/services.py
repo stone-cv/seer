@@ -172,7 +172,7 @@ async def process_video_file(
                                 try:
                                     logger.debug(f'Event: {event.__dict__}')
 
-                                    event = await Event.event_update_stone_area(
+                                    event = await Event.update(
                                         db_session=session,
                                         event_id=event.id,
                                         stone_area=str(stone_area)
@@ -415,7 +415,7 @@ async def check_for_motion(
 
             # если объект движется, но до этого был статичен, создаем событие о начале движения объекта
             elif in_motion and not already_moving:
-                event = await Event.event_create(
+                event = await Event.create(
                     db_session=db_session,
                     type_id=3,  # событие "Начало распила товарного блока". TODO rm hardcoded id
                     camera_id=camera_id,
@@ -426,7 +426,7 @@ async def check_for_motion(
 
             # если объект статичен, но до этого был в движении, создаем событие об остановке объекта
             elif not in_motion and already_moving:
-                event = await Event.event_create(
+                event = await Event.create(
                     db_session=db_session,
                     type_id=4,  # событие "Окончание распила товарного блока". TODO rm hardcoded id
                     camera_id=camera_id,
@@ -532,7 +532,7 @@ async def check_if_stone_present_or_transferred(
                 all(obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
             ):
 
-                event = await Event.event_create(
+                event = await Event.create(
                     db_session=db_session,
                     type_id=1,  # событие "Новый товарный блок на станке". TODO rm hardcoded id
                     camera_id=camera_id,
@@ -560,7 +560,7 @@ async def check_if_stone_present_or_transferred(
                 all(not obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
             ):
 
-                event = await Event.event_create(
+                event = await Event.create(
                     db_session=db_session,
                     type_id=2,  # событие "Товарный блок убран со станка". TODO rm hardcoded id
                     camera_id=camera_id,
@@ -579,7 +579,7 @@ async def check_if_stone_present_or_transferred(
         all(obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
     ):
 
-        event = await Event.event_create(
+        event = await Event.create(
             db_session=db_session,
             type_id=1,  # событие "Новый товарный блок на станке". TODO rm hardcoded id
             camera_id=camera_id,
@@ -595,7 +595,7 @@ async def check_if_stone_present_or_transferred(
         all(not obj_present_result for obj_present_result in object_history[-(curr_fps * 60):])
     ):
 
-        event = await Event.event_create(
+        event = await Event.create(
             db_session=db_session,
             type_id=2,  # событие "Товарный блок убран со станка". TODO rm hardcoded id
             camera_id=camera_id,

@@ -33,11 +33,11 @@ class Detector:
         
         self.model = self.load_model(mode)
         
-        self.CLASS_NAMES_DICT = self.model.model.names
-        print(self.CLASS_NAMES_DICT['saw'])
+        self.class_names_dict = self.model.model.names
+        self.class_ids_dict = {val: key for key, val in self.class_names_dict.items()}
+        print(self.class_ids_dict)
     
         # self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
-    
 
     def load_model(self, mode: str):
        
@@ -197,7 +197,7 @@ class Detector:
 
                     prediction = {
                         "class_id": int(class_id),
-                        "class_name": self.CLASS_NAMES_DICT[class_id],
+                        "class_name": self.class_names_dict[class_id],
                         # "track_id": 0,
                         "track_id": int(track_id),
                         "conf": round(float(conf), 2),  # invalid format for json
@@ -308,7 +308,7 @@ class Detector:
         
     
         # Format custom labels
-        self.labels = [f"{self.CLASS_NAMES_DICT[class_id]} {confidence:0.2f}"
+        self.labels = [f"{self.class_names_dict[class_id]} {confidence:0.2f}"
         for _, confidence, class_id, tracker_id
         in detections]
         

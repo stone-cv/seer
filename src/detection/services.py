@@ -109,7 +109,7 @@ async def process_video_file(
                             class_ids.append(item['class_id'])
 
                             # логика, относящаяся к пиле: проверка на движение
-                            if item['class_id'] == detector.CLASS_NAMES_DICT['saw']:  # ID класса пилы
+                            if item['class_id'] == detector.class_ids_dict['saw']:
                                 saw_track_magn, saw_already_moving, saw_event = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
@@ -127,17 +127,16 @@ async def process_video_file(
                     # логика, относящаяся к камням: проверка на наличие и перемещение
                     stone_already_present, stone_history, stone_event = await check_if_stone_present_or_transferred(
                         db_session=session,
-                        stone_id=0,  # ID класса камня
+                        stone_id=detector.class_ids_dict['stone'],
                         detected_class_ids=class_ids,
                         object_history=stone_history,
                         object_already_present=stone_already_present,
-                        forklift_id=2,  # ID класса погрузчика
+                        forklift_id=detector.class_ids_dict['forklift'],
                         forklift_history=forklift_history,
                         saw_already_moving=saw_already_moving,
                         curr_fps=curr_fps,
                         detection_time=detection_time,
                         camera_id=camera_id,
-                        # frame=frame
                     )
                     if stone_event:  #and stone_event.type_id != 2:
                         event_list.append(stone_event)

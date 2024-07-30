@@ -34,14 +34,14 @@ class Detector:
         self.model = self.load_model(mode)
         
         self.CLASS_NAMES_DICT = self.model.model.names
-        print(self.CLASS_NAMES_DICT)
+        print(self.CLASS_NAMES_DICT['saw'])
     
         # self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
     
 
     def load_model(self, mode: str):
        
-        # model = YOLO("yolov8l.pt")  # load a pretrained YOLOv8n model
+        # model = YOLO("yolov8l.pt")  # l-models for init training
         if mode == 'det':
             model = YOLO(cfg.weights_det)
         if mode == 'seg':

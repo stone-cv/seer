@@ -109,7 +109,7 @@ async def process_video_file(
                             class_ids.append(item['class_id'])
 
                             # логика, относящаяся к пиле: проверка на движение
-                            if item['class_id'] == 1:  # ID класса пилы
+                            if item['class_id'] == detector.CLASS_NAMES_DICT['saw']:  # ID класса пилы
                                 saw_track_magn, saw_already_moving, saw_event = await check_for_motion(
                                     db_session=session,
                                     xywh_history=saw_xywh_history,
@@ -358,7 +358,6 @@ async def check_for_motion(
         curr_fps: int,
         detection_time: datetime,
         camera_id: int,
-        # frame: np.ndarray
 ) -> tuple[float, bool, Event]:
     """
     Функция, позволяющая определить, движется ли объект (пила):
@@ -455,7 +454,6 @@ async def check_if_stone_present_or_transferred(
         camera_id: int,
         stone_id: int = 0,
         forklift_id: int = 2
-        # frame: np.ndarray
 ) -> tuple[bool, list[bool], Event]:
     """
     Функция, позволяющая определить, присутствиует ли на видео объект (камень):

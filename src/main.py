@@ -23,8 +23,8 @@ async def main():
     logger.info('App initiated')
 
     """ инициализация моделей для обучения и обработки отдельных видеофайлов """
-    #detector = Detector(mode='det')
-    #seg_detector = Detector(mode='seg')
+    # detector = Detector(mode='det')
+    # seg_detector = Detector(mode='seg')
 
     """ инициализация приложения для поиска, скачивания, и обработки видео """
     app = Application()
@@ -43,6 +43,9 @@ async def main():
 
     """ обучение модели """
     # logger.info(f'Training started')
+
+    # await detector.augment_dataset_dir()
+
     # detector.train_custom(
     #     data='datasets/data.yaml',
     #     split_required=False

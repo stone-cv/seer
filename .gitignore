@@ -162,16 +162,16 @@ cython_debug/
 
 venv/
 runs/
-static/
 results/
 deep_sort/
-datasets/
 *.ini
 temp/
 *.mp4
 *.mov
 *.png
 *.jpeg
+*.json
+*.txt
 
 .DS_Store
 *.pt

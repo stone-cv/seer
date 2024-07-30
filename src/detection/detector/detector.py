@@ -23,10 +23,23 @@ from core.logger import logger
 
 class Detector:
 
-    def __init__(self, mode: str, capture_index: int = 0):
-       
-        self.capture_index = capture_index
+    def __init__(
+            self,
+            mode: str
+    ) -> None:
+        """
+        Инициализация объекта детектора:
+            - выбор устройства для работы (CUDA, если доступен GPU, иначе CPU),
+            - загрузка нужной модели,
+            - загрузка словаря с названиями классов,
+            - создание словаря с идентификаторами классов (для упрощения дальнейшей работы).
+
+        Args:
+            mode (str): режим работы: 'det' для детекции или 'seg' для сегментации
         
+        Returns:
+            None
+        """
         self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         # self.device = 'mps'  # 'cpu'
         print("Using Device: ", self.device)
@@ -38,7 +51,20 @@ class Detector:
     
         # self.box_annotator = sv.BoxAnnotator(sv.ColorPalette.default(), thickness=3, text_thickness=3, text_scale=1.5)
 
-    def load_model(self, mode: str):
+    def load_model(
+            self,
+            mode: str
+        ) -> YOLO:
+        """
+        Загрузка модели.
+        В зависимости от указанноого режима работы выбираются нужные веса (путь прописан в конфиг. файле).
+
+        Args:
+            mode (str): 'det' для детекции или 'seg' для сегментации
+
+        Returns:
+            model (YOLO): модель
+        """
        
         # model = YOLO("yolov8l.pt")  # l-models for init training
         if mode == 'det':
@@ -50,9 +76,23 @@ class Detector:
     
         return model
     
-    def augment_dataset_dir(self):
-        input_dir = 'datasets/seg/for_augmentation'
-        output_dir = 'datasets/seg/augmented'
+    def augment_dataset_dir(
+        self,
+        input_dir: str = 'src/datasets/obj_train_data',
+        output_dir: str = 'src/datasets/seg/augmented'
+    ) -> None:
+        """
+        Функция для аугментации изображений в датасете.
+        Агументация производится с помощью torchvision.transforms:
+        преобразовывается контраст, яркости и гамма (ч/б).
+
+        Args:
+            input_dir (str): путь до директории с исходными изображениями
+            output_dir (str): путь до директории с аугментированными изображениями
+
+        Returns:
+            None
+        """
 
         os.makedirs(output_dir, exist_ok=True)
 
@@ -76,47 +116,72 @@ class Detector:
         print('Data augmentation completed!')
     
 
-    def split_dataset(self):
-            dataset_txt_path = "datasets/obj_train_data"
-            dataset_images_path = "datasets/images_train"
-            train_path = "datasets/datasets/train"
-            val_path = "datasets/datasets/val"
+    def split_dataset(
+        self,
+        dataset_txt_path: str = "src/datasets/obj_train_data",
+        dataset_images_path: str = "src/datasets/images_train",
+        train_path: str = "src/datasets/datasets/train",
+        val_path: str = "src/datasets/datasets/val",
+        train_ratio: float = 0.8
+    ) -> None:
+        """
+        Функция для разделения датасета на обучающий и валидационный
+        (по умолчанию в пропорции 80% для обучающей выборки и 20% для валидационной).
 
-            train_ratio = 0.8
+        Названия файлов в соответствии с конвенцией наименования скриншотов в VLC проигрывателе
+        (+ обрезанные изображения), формат изображений - PNG.
 
-            annotation_files = os.listdir(dataset_txt_path)
-            random.shuffle(annotation_files)
+        Args:
+            dataset_txt_path (str): путь до директории с аннотациями
+            dataset_images_path (str): путь до директории с изображениями
+            train_path (str): путь до директории с обучающим датасетом
+            val_path (str): путь до директории с валидационным датасетом
+            train_ratio (float): пропорции обучающей выборки
+        
+        Returns:
+            None
+        """
+        annotation_files = os.listdir(dataset_txt_path)
+        random.shuffle(annotation_files)
 
-            num_files = len(annotation_files)
-            num_train = int(num_files * train_ratio)
+        num_files = len(annotation_files)
+        num_train = int(num_files * train_ratio)
 
-            train_files = annotation_files[:num_train]
-            val_files = annotation_files[num_train:]
+        train_files = annotation_files[:num_train]
+        val_files = annotation_files[num_train:]
 
-            for file in train_files:
-                logger.debug(file)
-                if file.startswith('vlcsnap') or file.startswith('cropped'):
-                    shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{train_path}/labels', file))
-                    shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{train_path}/images', file.split(".")[0] + ".png"))
+        for file in train_files:
+            logger.debug(file)
+            if file.startswith('vlcsnap') or file.startswith('cropped'):
+                shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{train_path}/labels', file))
+                shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{train_path}/images', file.split(".")[0] + ".png"))
 
-            for file in val_files:
-                logger.debug(file)
-                if file.startswith('vlcsnap') or file.startswith('cropped'):
-                    shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{val_path}/labels', file))
-                    shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{val_path}/images', file.split(".")[0] + ".png"))
-
+        for file in val_files:
+            logger.debug(file)
+            if file.startswith('vlcsnap') or file.startswith('cropped'):
+                shutil.move(os.path.join(dataset_txt_path, file), os.path.join(f'{val_path}/labels', file))
+                shutil.move(os.path.join(dataset_images_path, file.split(".")[0] + ".png"), os.path.join(f'{val_path}/images', file.split(".")[0] + ".png"))
 
     def train_custom(self, data, split_required):
+        """
+        Кастомная функция для обучения модели (с заданными параметрами).
+        В целях логирования можно использовать таску в ClearML.
+        При необходимости можно разделить датасет на обучающую и валидационную выборки.
 
-        task = Task.init(project_name="stone-cv", task_name=f"training_{time()}")
+        Args:
+            data (str): путь до конфиг. файла
+            split_required (bool): флаг разделения датасета на обучающую и валидационную выборки
+        """
+        # task = Task.init(project_name="stone-cv", task_name=f"training_{time()}")
 
+        # разделение датасета на обучающую и валидационную выборки
         if split_required:
             self.split_dataset()
 
         results = self.model.train(
             data=data,
-            epochs=10,
-            batch=8,
+            epochs=50,
+            batch=16,
             device=self.device,
             resume=True,
         )
@@ -125,12 +190,20 @@ class Detector:
 
 
     def predict_custom(self, source):
+        """
+        Кастомная функция для работы модели (предсказания) с заданными параметрами
+        (низкая (0.3) уверенность обоснована низкой степенью ложноположитеных результатов детекции).
 
+        Args:
+            source (str): источник изображения (кадр)
+
+        Returns:
+            results: результаты детекции
+        """
         results = self.model(
             source=source,
             device=self.device,
             conf=0.3,
-            # stream=True,
             # show=True
         )
         
@@ -139,14 +212,13 @@ class Detector:
 
     def thread_safe_predict(self, mode, source):
 
-        # Instantiate a new model inside the thread
+        # should init a new model inside thread
         local_model = self.load_model(mode)
 
         results = local_model.predict(
             source=source,
             device=self.device,
             conf=0.3,
-            # stream=True,
             # show=True
         )
 
@@ -160,7 +232,16 @@ class Detector:
     
 
     def track_custom(self, source):
+        """
+        Кастомная функция для работы модели (предсказания) и трекера с заданными параметрами
+        (низкая (0.3) уверенность обоснована низкой степенью ложноположитеных результатов детекции).
 
+        Args:
+            source: источник изображения (кадр)
+
+        Returns:
+            results: результаты детекции
+        """
         results = self.model.track(
             source=source,
             persist=True,
@@ -168,14 +249,31 @@ class Detector:
             iou=0.5,
             device=self.device,
             # tracker="bytetrack.yaml",
-            # stream=True,
             # show=True
         )
 
         return results
     
 
-    def parse_detections(self, results):
+    def parse_detections(self, results) -> dict:
+        """
+        Парсинг результатов детекции.
+        Из массива с результатами извлекаются:
+            - ID класса,
+            - коэффициент уверенности,
+            - координаты bbox'а в формате XYXY (x1, y1, x2, y2),
+            - координаты bbox'а в формате XYWH (x, y, ширина, высота),
+            - ID объекта на основании трекера.
+        По результатам парсинга формируется словарь с вышеперечисленными
+        данными, а также такими параметрами, как время детекции объекта 
+        и флаг движения объекта.
+
+        Args:
+            results: результаты детекции
+
+        Returns:
+            frame_pred (dict): словарь с распарсенными предсказаниями
+        """
         try:
             frame_pred = []
             for result in results:
@@ -199,7 +297,7 @@ class Detector:
                         "class_name": self.class_names_dict[class_id],
                         # "track_id": 0,
                         "track_id": int(track_id),
-                        "conf": round(float(conf), 2),  # invalid format for json
+                        "conf": round(float(conf), 2),
                         "time": 0,
                         "xyxy": xyxy,
                         "xywh": xywh,
@@ -215,7 +313,7 @@ class Detector:
         except Exception as e:
             logger.error(f'{e} {traceback.format_exc()}')
         
-        return frame_pred  # detections
+        return frame_pred
     
 
     def parse_segmentation(self, results):
@@ -230,6 +328,17 @@ class Detector:
         
     
     def plot_segmentation(self, segment, image, detection_time):
+        """
+        Функция для отрисовки маски (в результате сегментации) на кадре.
+
+        Args:
+            segment: маска
+            image: кадр
+            detection_time: время детекции (для названия файла)
+
+        Returns:
+            plotted_img: изображение с отрисованной маской
+        """
         # image_open = cv2.imread(image)
 
         # draw contour
@@ -347,5 +456,5 @@ class Detector:
         
         
 if __name__ == '__main__':
-    detector = Detector(capture_index=0)
+    detector = Detector()
     detector()

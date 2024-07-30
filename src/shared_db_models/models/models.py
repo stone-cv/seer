@@ -22,6 +22,16 @@ from shared_db_models.models.base_model import BaseCRUD
 
 
 class Camera(BaseCRUD):
+    """
+    Модель камеры.
+    Параметры:
+        id: ID камеры в БД
+        name: наименование камеры
+        track_id: ID камеры в API видеорегистратора
+        url: URL для скачивания видеофайлов
+        roi: координаты области интереса
+        deleted: флаг удаления камеры в БД
+    """
     __tablename__ = "cameras"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -64,7 +74,17 @@ class Camera(BaseCRUD):
         db_session: AsyncSession,
         camera_id: int
     ) -> str:
+        """
+        Функция, позволяющая получить URL для скачивания видеофайлов
+        по идентификатору камеры, а также добавить в URL авторизационные параметры.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+            camera_id (int): ID камеры
+
+        Returns:
+            camera_url (str): URL для скачивания видеофайлов
+        """
         camera = await db_session.execute(
             select(Camera).filter(
                 Camera.id == camera_id
@@ -96,7 +116,17 @@ class Camera(BaseCRUD):
         db_session: AsyncSession,
         camera_id: int
     ) -> list:
+        """
+        Функция, позволяющая получить координаты области интереса
+        по идентификатору камеры.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+            camera_id (int): ID камеры
+
+        Returns:
+            camera_roi (list): координаты области интереса
+        """
         camera = await db_session.execute(
             select(Camera).filter(
                 Camera.id == camera_id
@@ -115,7 +145,17 @@ class Camera(BaseCRUD):
         db_session: AsyncSession,
         camera_id: int
     ) -> list:
+        """
+        Функция, позволяющая получить TrackID (ID камеры в API видеорегистратора)
+        по идентификатору камеры.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+            camera_id (int): ID камеры
+
+        Returns:
+            track_id (list): track_id
+        """
         camera = await db_session.execute(
             select(Camera).filter(
                 Camera.id == camera_id
@@ -130,6 +170,19 @@ class Camera(BaseCRUD):
 
 
 class Event(BaseCRUD):
+    """
+    Модель события (срабатывания сценария по результатам детекции).
+    Параметры:
+        id: ID события
+        type_id: ID типа события
+        camera_id: ID камеры
+        time: время срабатывания события
+        machine: идентификатор станка на производстве
+        stone_number: идентификатор анализируемого камня
+        stone_area: площадь камня
+        comment: комментарий
+        deleted: флаг удаления в БД
+    """
     __tablename__ = "events"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -148,57 +201,6 @@ class Event(BaseCRUD):
     comment: Mapped[str] = mapped_column(String, default='см2', nullable=True)
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-
-    # @staticmethod
-    # async def event_create(
-    #     *,
-    #     db_session: AsyncSession,
-    #     type_id: int,
-    #     camera_id: int,
-    #     time: datetime,
-    #     machine: Optional[str] = 'PW1TK 3000',
-    #     stone_number: Optional[int] = 1,
-    #     stone_area: Optional[str] = '0',
-    #     comment: Optional[str] = 'см2'
-    # ) -> 'Event':
-
-    #     event = Event(
-    #         type_id=type_id,
-    #         camera_id=camera_id,
-    #         time=time,
-    #         machine=machine,
-    #         stone_number=stone_number,
-    #         stone_area=stone_area,
-    #         comment=comment
-    #     )
-
-    #     db_session.add(event)
-    #     await db_session.commit()
-
-    #     logger.debug(f'Event created: {event.__dict__}')
-
-    #     return event
-    
-    # @staticmethod
-    # async def event_update_stone_area(
-    #     *,
-    #     db_session: AsyncSession,
-    #     event_id: int,
-    #     stone_area: str
-    # ) -> str:
-
-    #     event = await db_session.execute(
-    #         select(Event).filter(
-    #             Event.id == event_id
-    #         )
-    #     )
-    #     event = event.scalars().first()
-    #     event.stone_area = stone_area
-    #     logger.info(f'Event {event_id} stone area updated: {event.stone_area}')
-
-    #     await db_session.commit()
-
-    #     return event
     
     @staticmethod
     async def convert_event_to_json(
@@ -206,7 +208,16 @@ class Event(BaseCRUD):
         db_session: AsyncSession,
         event: 'Event'
     ):
+        """
+        Функция, позволяющая преобразовать объект события в формат JSON.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+            event (Event): объект созданного события
+
+        Returns:
+            event_json (str): данные в формате JSON
+        """
         event_type = await EventType.get_by_id(
             db_session=db_session,
             id=event.type_id
@@ -229,6 +240,13 @@ class Event(BaseCRUD):
 
 
 class EventType(BaseCRUD):
+    """
+    Модель типа события (срабатывания сценария по результатам детекции).
+    Параметры:
+        id: ID типа события
+        name: наименование типа события
+        deleted: флаг удаления в БД
+    """
     __tablename__ = "event_types"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -243,7 +261,16 @@ class EventType(BaseCRUD):
         db_session: AsyncSession,
         name: str
     ) -> int:
+        """
+        Функция, позволяющая получить ID типа события по его наименованию.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+            name (str): наименование типа события
+
+        Returns:
+            event_type_id (int): ID типа события
+        """
         event_type = await db_session.execute(
             select(EventType).filter(
                 EventType.name == name
@@ -256,6 +283,23 @@ class EventType(BaseCRUD):
 
 
 class VideoFile(BaseCRUD):
+    """
+    Модель скачанного видеофайла.
+    Параметры:
+        id: ID видеофайла
+        camera_id: ID камеры
+        path: путь к видеофайлу
+        playback_uri: URI для загрзки видеофайла
+        vid_start: время начала видеофайла
+        vid_end: время окончания видеофайла
+        is_downloaded: флаг скачивания видеофайла
+        download_start: время начала скачивания видеофайла
+        download_end: время окончания скачивания видеофайла
+        is_processed: флаг обработки видеофайла
+        det_start: время начала обработки видеофайла
+        det_end: время окончания обработки видеофайла
+        deleted: флаг удаления в БД
+    """
     __tablename__ = "video_files"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -284,7 +328,16 @@ class VideoFile(BaseCRUD):
         db_session: AsyncSession,
         file_id: int
     ) -> bool:
+        """
+        Функция, позволяющая проверить, был ли загружен видеофайл.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+            file_id (int): ID видеофайла
+
+        Returns:
+            is_downloaded (bool): флаг скачивания видеофайла
+        """
         file = await db_session.execute(
             select(VideoFile).filter(
                 VideoFile.id == file_id
@@ -299,8 +352,16 @@ class VideoFile(BaseCRUD):
     async def get_unprocessed_files(
         *,
         db_session: AsyncSession
-    ) -> str:
+    ) -> list:
+        """
+        Функция, позволяющая получить список загруженных, но не обработанных видеофайлов.
 
+        Args:
+            db_session (AsyncSession): объект асинхронной сессии БД
+
+        Returns:
+            files (list): список необработанных видеофайлов
+        """
         files = await db_session.execute(
             select(VideoFile).filter(
                 VideoFile.is_downloaded == True,
@@ -313,6 +374,8 @@ class VideoFile(BaseCRUD):
 
         return files
     
+
+# region Проверка окончания обработки файлов за день
 
 class DailyCamCheck(BaseCRUD):
     __tablename__ = "daily_cam_check"
@@ -337,3 +400,5 @@ class DailyAllCamCheck(BaseCRUD):
     is_processed: Mapped[bool] = mapped_column(Boolean)
 
     deleted: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+# endregion

@@ -250,7 +250,7 @@ class Application:
 
                 self.queue_download_video.task_done()
     
-    async def process_video_file(self):
+    async def process_video_files(self):
         """
         Обработка загруженных видео
         """

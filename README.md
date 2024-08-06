@@ -26,6 +26,8 @@ docker compose up
 
 ```sh
 pipenv install
+pipenv shell
 cd src
+export CONFIG=config.yaml
 python main.py
 ```

@@ -127,15 +127,16 @@ class Camera(BaseCRUD):
         Returns:
             camera_roi (list): координаты области интереса
         """
-        camera = await db_session.execute(
-            select(Camera).filter(
-                Camera.id == camera_id
-            )
-        )
-        camera = camera.scalars().first()
+        # camera = await db_session.execute(
+        #     select(Camera).filter(
+        #         Camera.id == camera_id
+        #     )
+        # )
+        # camera = camera.scalars().first()
 
-        camera_roi = ast.literal_eval(camera.roi)
-        logger.debug(f'Camera {camera_id} ROI retrieved: {camera_roi} ({type(camera_roi)})')
+        roi = '((624, 7), (1539, 555))'
+        camera_roi = ast.literal_eval(roi)
+        logger.debug(f'Camera ROI retrieved: {camera_roi} ({type(camera_roi)})')
 
         return camera_roi
     
@@ -218,10 +219,18 @@ class Event(BaseCRUD):
         Returns:
             event_json (str): данные в формате JSON
         """
-        event_type = await EventType.get_by_id(
-            db_session=db_session,
-            id=event.type_id
-        )
+        # event_type = await EventType.get_by_id(
+        #     db_session=db_session,
+        #     id=event.type_id
+        # )
+        event_types = {
+            1: 'Новый товарный блок на станке',
+            2: 'Товарный блок убран со станка',
+            3: 'Начало распила товарного блока',
+            4: 'Окончание распила товарного блока'
+        }
+        event_type = event_types[event.type_id]
+        print(event_type)
 
         if not event.stone_area:
             event.stone_area = 0
@@ -229,7 +238,7 @@ class Event(BaseCRUD):
         event_dict = {
             "date": event.time.strftime('%Y-%m-%d %H:%M:%S'),
             "machine": "PW1TK 3000",
-            "operation": event_type.name,
+            "operation": event_type,
             "number": "0",
             "area": float(event.stone_area),
             "comment": "площадь в см2"

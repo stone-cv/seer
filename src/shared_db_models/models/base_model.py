@@ -35,8 +35,8 @@ class BaseCRUD(Base):
 
         result = cls(**kwargs)
 
-        db_session.add(result)
-        await db_session.commit()
+        # db_session.add(result)
+        # await db_session.commit()
 
         logger.debug(f'DB record for {cls.__name__} created: {result.__dict__}')
 

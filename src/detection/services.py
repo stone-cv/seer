@@ -171,11 +171,12 @@ async def process_video_file(
                                 try:
                                     logger.debug(f'Event: {event.__dict__}')
 
-                                    event = await Event.update(
-                                        db_session=session,
-                                        id=event.id,
-                                        stone_area=str(stone_area)
-                                    )
+                                    # event = await Event.update(
+                                    #     db_session=session,
+                                    #     id=event.id,
+                                    #     stone_area=str(stone_area)
+                                    # )
+                                    event.stone_area = str(stone_area)
 
                                     if cfg.send_json:
                                         json = await Event.convert_event_to_json(
@@ -415,7 +416,7 @@ async def check_for_motion(
             elif in_motion and not already_moving:
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Начало распила товарного блока'),
+                    type_id=3,
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -426,7 +427,7 @@ async def check_for_motion(
             elif not in_motion and already_moving:
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Окончание распила товарного блока'),
+                    type_id=4,
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -531,7 +532,7 @@ async def check_if_stone_present_or_transferred(
 
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Новый товарный блок на станке'),
+                    type_id=1,
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -559,7 +560,7 @@ async def check_if_stone_present_or_transferred(
 
                 event = await Event.create(
                     db_session=db_session,
-                    type_id=await EventType.get_id_by_name(db_session=db_session, name='Товарный блок убран со станка'),
+                    type_id=2,
                     camera_id=camera_id,
                     time=detection_time
                 )
@@ -578,7 +579,7 @@ async def check_if_stone_present_or_transferred(
 
         event = await Event.create(
             db_session=db_session,
-            type_id=await EventType.get_id_by_name(db_session=db_session, name='Новый товарный блок на станке'),
+            type_id=1,
             camera_id=camera_id,
             time=detection_time-timedelta(minutes=1)
         )
@@ -594,7 +595,7 @@ async def check_if_stone_present_or_transferred(
 
         event = await Event.create(
             db_session=db_session,
-            type_id=await EventType.get_id_by_name(db_session=db_session, name='Товарный блок убран со станка'),
+            type_id=2,
             camera_id=camera_id,
             time=detection_time-timedelta(minutes=1)
         )

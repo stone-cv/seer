@@ -249,7 +249,7 @@ class Detector:
             iou=0.5,
             device=self.device,
             # tracker="bytetrack.yaml",
-            # show=True
+            show=True
         )
 
         return results

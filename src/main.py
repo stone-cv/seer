@@ -23,17 +23,17 @@ async def main():
     logger.info('App initiated')
 
     """ инициализация моделей для обучения и обработки отдельных видеофайлов """
-    # detector = Detector(mode='det')
-    # seg_detector = Detector(mode='seg')
+    detector = Detector(mode='det')
+    seg_detector = Detector(mode='seg')
 
     """ инициализация приложения для поиска, скачивания, и обработки видео """
-    app = Application()
-    app.start()
-    try:
-        while app.status == 1:
-            await asyncio.sleep(5)
-    except KeyboardInterrupt:
-        app.stop()
+    #app = Application()
+    #app.start()
+    #try:
+    #    while app.status == 1:
+    #        await asyncio.sleep(5)
+    #except KeyboardInterrupt:
+    #    app.stop()
 
     """ создание БД """
     # async with db_engine.begin() as conn:
@@ -56,14 +56,14 @@ async def main():
 
     """ обработка отдельного видеофайла """
 
-    #await process_video_file(
-    #    detector=detector,
-    #    seg_detector=seg_detector,
-    #    video_path=cfg.video_path,
-    #    saw_already_moving=None,
-    #    stone_already_present=None,
-    #    camera_id=cfg.camera_id
-    #)
+    await process_video_file(
+        detector=detector,
+        seg_detector=seg_detector,
+        video_path=cfg.video_path,
+        saw_already_moving=None,
+        stone_already_present=None,
+        camera_id=cfg.camera_id
+    )
 
 
 if __name__ == '__main__':

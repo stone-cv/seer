@@ -56,7 +56,7 @@ class Application:
 
         # создаем воркеров для обработки видеофайла
         for _ in range(1):
-            task = asyncio.Task(self.process_video_file())
+            task = asyncio.Task(self.process_video_files())
             self.tasks_process_video.append(task)
 
         # создаем таску для генерации временных параметров поиска нового видео
@@ -104,7 +104,7 @@ class Application:
             self.tasks_download_video.append(task)
 
         for _ in range(1):
-            task = asyncio.Task(self.process_video_file())
+            task = asyncio.Task(self.process_video_files())
             self.tasks_process_video.append(task)
 
         self.task_generate = asyncio.Task(self.generate_datetime_queue(
